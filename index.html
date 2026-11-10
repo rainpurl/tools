@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Convert</title>
+<meta name="description" content="Convert files, edit images, batch resize, edit PDFs and preview almost anything. Everything runs in your browser. Nothing is uploaded.">
+<meta name="color-scheme" content="light">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600&display=swap">
+<link rel="stylesheet" href="css/app.css">
+<link rel="modulepreload" href="js/main.js">
+<link rel="modulepreload" href="js/ui/dom.js">
+<link rel="modulepreload" href="js/ui/convert.js">
+<link rel="modulepreload" href="js/engine/util.js">
+<link rel="modulepreload" href="js/engine/containers.js">
+<link rel="modulepreload" href="js/engine/registry.js">
+<link rel="modulepreload" href="js/engine/detect.js">
+<link rel="modulepreload" href="js/engine/modules.js">
+<link rel="modulepreload" href="js/engine/canvas.js">
+<link rel="modulepreload" href="js/worker/pool.js">
+<script type="module" src="js/main.js"></script>
+</head>
+<body>
+<main>
+  <nav class="apps" role="tablist" aria-label="Tools">
+    <button class="app on" role="tab" data-app="convert" aria-selected="true">Convert</button>
+    <button class="app" role="tab" data-app="images" aria-selected="false">Images</button>
+    <button class="app" role="tab" data-app="batch" aria-selected="false">Batch</button>
+    <button class="app" role="tab" data-app="pdf" aria-selected="false">PDF</button>
+    <button class="app" role="tab" data-app="preview" aria-selected="false">Preview</button>
+  </nav>
+
+  <div id="unsupported" class="warn hide"></div>
+
+<section id="app-convert" class="app-panel" role="tabpanel">
+  <div class="panel">
+    <h2>1. Files</h2>
+    <div id="drop" class="drop" data-app="convert" data-input="fileInput"><b>Choose files</b>, drop them anywhere, or paste</div>
+    <input id="fileInput" type="file" multiple class="hide">
+    <div id="fileList" class="files"></div>
+    <div class="fsum hide" id="fileSum"><span id="fileSumText"></span><span class="grow"></span><button class="sm" id="clearFiles">Clear all</button></div>
+  </div>
+
+  <div class="panel off" id="panelTarget">
+    <h2>2. Convert to</h2>
+    <div class="row seek">
+      <input id="tSearch" type="search" placeholder="Filter formats, try jpg or subtitle or data" autocomplete="off" spellcheck="false" aria-label="Filter output formats">
+      <label class="chk"><input type="checkbox" id="tShowAll"> Show unreachable</label>
+      <span class="tcount" id="tCount"></span>
+    </div>
+    <div id="targets" class="targets"></div>
+    <p class="note" id="targetNote">Add files to see available formats.</p>
+    <div id="routes" class="routes"></div>
+  </div>
+
+  <div class="panel off" id="panelOpts">
+    <h2>3. Options</h2>
+    <div id="opts" class="opts"></div>
+  </div>
+
+  <div class="panel off" id="panelRun">
+    <h2>4. Run</h2>
+    <div class="row" style="margin-bottom:16px">
+      <button id="go" class="primary" disabled title="Ctrl or Cmd with Enter">Convert</button>
+      <button id="stop" disabled>Stop</button>
+      <button id="saveAll" class="sm hide">Download all as zip</button>
+      <button id="saveDir" class="sm hide">Save to folder</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="sDone">0</b><span>converted</span></div>
+      <div class="stat"><b id="sOut">0</b><span>files out</span></div>
+      <div class="stat"><b id="sBytes">0</b><span>produced</span></div>
+      <div class="stat"><b id="sSkip">0</b><span>skipped</span></div>
+      <div class="stat"><b id="sErr">0</b><span>failed</span></div>
+    </div>
+    <div class="row" style="margin-bottom:8px"><span class="eta" id="eta"></span></div>
+    <div class="bar"><i id="bar"></i></div>
+    <div id="log" role="log" aria-live="polite">Ready.</div>
+    <div id="results" class="out"></div>
+  </div>
+</section>
+
+<section id="app-images" class="app-panel hide" role="tabpanel">
+  <div class="panel">
+    <h2>Images</h2>
+    <div id="iDrop" class="drop" data-app="images" data-input="iInput"><b>Choose images</b> or drop them here</div>
+    <input id="iInput" type="file" multiple class="hide">
+    <p class="note">Anything the Convert tab reads as an image works here, including SVG, EPS, PSD, TIFF, HEIC and the first page of a PDF.</p>
+    <div class="opts" style="margin-top:14px">
+      <div class="o"><label for="iVecSize">Render SVG, EPS and PDF at, longest side in px</label>
+        <input type="number" id="iVecSize" min="256" max="16384" step="256" value="4096"></div>
+    </div>
+    <div id="iList" class="files"></div>
+  </div>
+
+  <div class="panel off" id="iPanelEdit">
+    <h2 id="iTitle">Edit</h2>
+    <div class="row" style="margin-bottom:12px">
+      <button class="sm" id="iUndo">Undo</button>
+      <button class="sm" id="iReset">Reset</button>
+      <span class="tcount" id="iInfo"></span>
+    </div>
+    <div class="ed-wrap">
+      <div class="ed-stage" id="iStage">
+        <canvas id="iCanvas" width="1" height="1"></canvas>
+        <div id="iCrop" class="cropbox hide"><i data-c="nw"></i><i data-c="ne"></i><i data-c="sw"></i><i data-c="se"></i></div>
+      </div>
+    </div>
+    <div class="tools">
+      <div class="tool">
+        <h3>Crop</h3>
+        <div class="o"><label for="iAspect">Aspect ratio</label>
+          <select id="iAspect">
+            <option value="0">Free</option><option value="orig">Original</option>
+            <option value="1">1:1</option><option value="1.33333">4:3</option><option value="1.5">3:2</option>
+            <option value="1.77778">16:9</option><option value="0.75">3:4</option><option value="0.5625">9:16</option>
+          </select></div>
+        <div class="cropnums">
+          <label>x<input type="number" id="iCx" min="0" step="1"></label>
+          <label>y<input type="number" id="iCy" min="0" step="1"></label>
+          <label>width<input type="number" id="iCw" min="1" step="1"></label>
+          <label>height<input type="number" id="iCh" min="1" step="1"></label>
+        </div>
+        <div class="row">
+          <button class="sm" id="iCropStart">Draw crop</button>
+          <button class="sm" id="iCropApply">Apply crop</button>
+          <button class="sm" id="iCropCancel">Cancel</button>
+        </div>
+        <div class="row"><button class="sm" id="iTrim">Trim transparent edges</button></div>
+      </div>
+
+      <div class="tool">
+        <h3>Rotate and flip</h3>
+        <div class="row">
+          <button class="sm" id="iRotL">Rotate left</button>
+          <button class="sm" id="iRotR">Rotate right</button>
+          <button class="sm" id="iFlipH">Flip horizontal</button>
+          <button class="sm" id="iFlipV">Flip vertical</button>
+        </div>
+        <div class="o"><label for="iAngle">Any angle, in degrees</label>
+          <div class="range"><input type="range" id="iAngle" min="-180" max="180" step="0.5" value="0"><output>0</output></div></div>
+        <div class="o check"><input type="checkbox" id="iExpand" checked><label for="iExpand">Grow the canvas so no corner is cut off</label></div>
+        <div class="row"><button class="sm" id="iAngleApply">Apply angle</button></div>
+      </div>
+
+      <div class="tool">
+        <h3>Remove a colour</h3>
+        <div class="row">
+          <input type="color" id="iColor" value="#ffffff" aria-label="Colour to remove">
+          <button class="sm" id="iPick">Pick from image</button>
+          <span class="tcount" id="iColorHex">#ffffff</span>
+        </div>
+        <div class="o"><label for="iMode">Where</label>
+          <select id="iMode">
+            <option value="all">Everywhere in the image</option>
+            <option value="edges">Only where it touches the edges</option>
+            <option value="point">Only the area around the picked point</option>
+          </select></div>
+        <div class="o"><label for="iTol">Tolerance</label>
+          <div class="range"><input type="range" id="iTol" min="0" max="100" step="1" value="12"><output>12</output></div></div>
+        <div class="o"><label for="iSoft">Edge softness</label>
+          <div class="range"><input type="range" id="iSoft" min="0" max="50" step="1" value="6"><output>6</output></div></div>
+        <div class="row">
+          <button class="sm" id="iColorApply">Remove colour</button>
+          <button class="sm" id="iWhite">Remove white</button>
+          <button class="sm" id="iBlack">Remove black</button>
+        </div>
+      </div>
+
+      <div class="tool">
+        <h3>Remove background</h3>
+        <div class="o"><label for="iBgMethod">Method</label>
+          <select id="iBgMethod">
+            <option value="edges">Plain background, traced from the edges</option>
+            <option value="ai">AI model, for photos</option>
+          </select></div>
+        <div class="o" id="iBgTolRow"><label for="iBgTol">Tolerance</label>
+          <div class="range"><input type="range" id="iBgTol" min="0" max="100" step="1" value="18"><output>18</output></div></div>
+        <div class="o" id="iBgSoftRow"><label for="iBgSoft">Edge softness</label>
+          <div class="range"><input type="range" id="iBgSoft" min="0" max="50" step="1" value="8"><output>8</output></div></div>
+        <p class="onote" id="iBgNote"></p>
+        <div class="row"><button class="sm" id="iBgApply">Remove background</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel off" id="iPanelOut">
+    <h2>Save</h2>
+    <div class="opts">
+      <div class="o"><label for="iFmt">Format</label>
+        <select id="iFmt">
+          <option value="png">PNG</option><option value="webp">WebP</option><option value="jpeg">JPEG</option>
+          <option value="tiff">TIFF</option><option value="bmp">BMP</option><option value="gif">GIF</option>
+          <option value="ico">ICO</option><option value="tga">TGA</option><option value="qoi">QOI</option>
+          <option value="eps">EPS</option><option value="svg">SVG, image embedded</option>
+        </select></div>
+      <div class="o"><label for="iQuality">Quality for JPEG and WebP</label>
+        <div class="range"><input type="range" id="iQuality" min="0.3" max="1" step="0.01" value="0.92"><output>92</output></div></div>
+      <div class="o"><label for="iBg">Background for formats without transparency</label>
+        <input type="text" id="iBg" value="#ffffff"></div>
+      <div class="o"><label for="iName">File name</label><input type="text" id="iName" value="image"></div>
+    </div>
+    <div class="row" style="margin:14px 0 12px">
+      <button class="primary" id="iSave">Save image</button>
+      <button class="sm" id="iSaveAll">Save all as zip</button>
+    </div>
+    <div id="iLog" role="log" aria-live="polite">Ready.</div>
+    <div id="iResults" class="out"></div>
+  </div>
+</section>
+
+<section id="app-batch" class="app-panel hide" role="tabpanel">
+  <div class="panel">
+    <h2>1. Images</h2>
+    <div id="bDrop" class="drop" data-app="batch" data-input="bInput"><b>Choose images</b> or drop a whole folder</div>
+    <input id="bInput" type="file" multiple class="hide">
+    <div id="bList" class="files"></div>
+    <div class="fsum hide" id="bSum"><span id="bSumText"></span><span class="grow"></span><button class="sm" id="bClear">Clear all</button></div>
+  </div>
+
+  <div class="panel off" id="bPanelJob">
+    <h2>2. Job</h2>
+    <div class="opts">
+      <div class="ohead">Resize</div>
+      <div class="o"><label for="bMode">Size</label>
+        <select id="bMode">
+          <option value="keep">Keep the size</option>
+          <option value="long">Fit the longest side</option>
+          <option value="width">Fit the width</option>
+          <option value="height">Fit the height</option>
+          <option value="percent">Scale by percent</option>
+          <option value="box">Fit inside a box</option>
+          <option value="fill">Fill a box, cropping the overflow</option>
+        </select></div>
+      <div class="o" id="bSizeRow"><label for="bSize">Longest side in px</label>
+        <input type="number" id="bSize" min="1" max="16384" step="1" value="1600"></div>
+      <div class="o" id="bWidthRow"><label for="bWidth">Width in px</label>
+        <input type="number" id="bWidth" min="1" max="16384" step="1" value="1600"></div>
+      <div class="o" id="bHeightRow"><label for="bHeight">Height in px</label>
+        <input type="number" id="bHeight" min="1" max="16384" step="1" value="1200"></div>
+      <div class="o" id="bPercentRow"><label for="bPercent">Percent of the original</label>
+        <input type="number" id="bPercent" min="1" max="400" step="1" value="50"></div>
+      <div class="o check" id="bEnlargeRow"><input type="checkbox" id="bNoEnlarge" checked><label for="bNoEnlarge">Never enlarge a smaller image</label></div>
+
+      <div class="ohead">Compress</div>
+      <div class="o"><label for="bFormat">Format</label>
+        <select id="bFormat">
+          <option value="keep">Keep JPEG, PNG and WebP as they are</option>
+          <option value="jpeg">JPEG</option>
+          <option value="webp">WebP</option>
+          <option value="png">PNG, lossless</option>
+        </select></div>
+      <div class="o"><label for="bQuality">Quality for JPEG and WebP</label>
+        <div class="range"><input type="range" id="bQuality" min="0.3" max="1" step="0.01" value="0.82"><output>82</output></div></div>
+      <div class="o"><label for="bTarget">Largest file size in KB, 0 for no limit</label>
+        <input type="number" id="bTarget" min="0" step="10" value="0"></div>
+      <div class="o"><label for="bBg">Background for JPEG where the source is transparent</label>
+        <input type="text" id="bBg" value="#ffffff"></div>
+
+      <div class="ohead">Rename</div>
+      <div class="o"><label for="bPattern">Name pattern</label>
+        <input type="text" id="bPattern" value="{name}" spellcheck="false" autocomplete="off"></div>
+      <div class="o"><label for="bStart">First number for {n}</label>
+        <input type="number" id="bStart" min="0" step="1" value="1"></div>
+      <div class="o check"><input type="checkbox" id="bClean"><label for="bClean">Lower case, with dashes for spaces</label></div>
+      <p class="onote">Use <code>{name}</code> for the original name, <code>{n}</code> for a running number, <code>{w}</code> and <code>{h}</code> for the new size, <code>{date}</code> for today.</p>
+      <p class="onote" id="bPreview"></p>
+    </div>
+  </div>
+
+  <div class="panel off" id="bPanelRun">
+    <h2>3. Run</h2>
+    <div class="row" style="margin-bottom:16px">
+      <button id="bGo" class="primary">Run</button>
+      <button id="bStop" disabled>Stop</button>
+      <button id="bZip" class="sm hide">Download all as zip</button>
+      <button id="bDir" class="sm hide">Save to folder</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="bDone">0</b><span>done</span></div>
+      <div class="stat"><b id="bIn">0</b><span>read</span></div>
+      <div class="stat"><b id="bOut">0</b><span>written</span></div>
+      <div class="stat"><b id="bSaved">0%</b><span>smaller</span></div>
+      <div class="stat"><b id="bErr">0</b><span>failed</span></div>
+    </div>
+    <div class="bar"><i id="bBar"></i></div>
+    <div id="bLog" role="log" aria-live="polite">Ready.</div>
+    <div id="bResults" class="out"></div>
+  </div>
+</section>
+
+<section id="app-pdf" class="app-panel hide" role="tabpanel">
+  <div class="panel">
+    <h2>Document</h2>
+    <div id="pDrop" class="drop" data-app="pdf" data-input="pInput"><b>Choose a PDF</b> or drop one here</div>
+    <input id="pInput" type="file" accept="application/pdf,.pdf" multiple class="hide">
+    <p class="note" id="pInfo">Pages can be reordered, removed, rotated, cropped, rasterised or merged. Drag a page to move it.</p>
+  </div>
+
+  <div class="panel off" id="pPanelOps">
+    <h2>Pages</h2>
+    <div class="row" style="margin-bottom:12px">
+      <button class="sm" id="pSelAll">Select all</button>
+      <button class="sm" id="pSelNone">Select none</button>
+      <button class="sm" id="pSelOdd">Odd</button>
+      <button class="sm" id="pSelEven">Even</button>
+      <span class="tcount" id="pSelCount"></span>
+    </div>
+    <div class="row" style="margin-bottom:12px">
+      <button class="sm" id="pDelete">Remove selected</button>
+      <button class="sm" id="pRotL">Rotate left</button>
+      <button class="sm" id="pRotR">Rotate right</button>
+      <button class="sm" id="pMoveUp">Move earlier</button>
+      <button class="sm" id="pMoveDown">Move later</button>
+      <button class="sm" id="pReverse">Reverse order</button>
+      <button class="sm" id="pReset">Reset</button>
+    </div>
+    <div id="pPages" class="pages"></div>
+  </div>
+
+  <div class="panel off" id="pPanelCrop">
+    <h2>Crop</h2>
+    <p class="note">Margins are trimmed from each edge as a percentage of the page. Cropping is lossless, it only moves the visible box.</p>
+    <div class="opts" id="pCropOpts"></div>
+    <div class="row" style="margin-top:12px">
+      <button class="sm" id="pCropApply">Apply to selected</button>
+      <button class="sm" id="pCropClear">Clear crops</button>
+    </div>
+  </div>
+
+  <div class="panel off" id="pPanelOut">
+    <h2>Save</h2>
+    <div class="opts" id="pOutOpts"></div>
+    <div class="row" style="margin:14px 0 12px">
+      <button class="primary" id="pSave">Save PDF</button>
+      <button class="sm" id="pSaveSel">Save selected pages only</button>
+      <button class="sm" id="pSaveImages">Save pages as images</button>
+    </div>
+    <div class="bar"><i id="pBar"></i></div>
+    <div id="pLog" role="log" aria-live="polite">Ready.</div>
+    <div id="pResults" class="out"></div>
+  </div>
+</section>
+
+<section id="app-preview" class="app-panel hide" role="tabpanel">
+  <div class="panel">
+    <h2>File</h2>
+    <div id="vDrop" class="drop" data-app="preview" data-input="vInput"><b>Choose files</b> or drop them here</div>
+    <input id="vInput" type="file" multiple class="hide">
+    <div id="vList" class="files"></div>
+  </div>
+
+  <div class="panel off" id="vPanelView">
+    <h2 id="vTitle">Preview</h2>
+    <div id="vMeta" class="routes"></div>
+    <div id="vActs" class="acts"></div>
+    <div id="vStage" class="stage"></div>
+    <div id="vHelp" class="help hide"></div>
+  </div>
+</section>
+
+  <p class="foot">
+    <span>Files stay on this device. Nothing is uploaded.</span>
+    <a href="https://github.com/rainpurl/tools" rel="noopener">Source</a>
+  </p>
+</main>
+</body>
+</html>
