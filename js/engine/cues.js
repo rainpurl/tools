@@ -106,7 +106,7 @@ export function parseAss(text){
 
 export function cuesToAss(cues, opts){
   const head = `[Script Info]
-; Written by convert.html
+; Written by tools.katr.es
 ScriptType: v4.00+
 WrapStyle: 0
 ScaledBorderAndShadow: yes

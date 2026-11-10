@@ -53,7 +53,7 @@ export function objDecode(text, name){
 }
 
 export function meshToObj(m){
-  const out = [`# written by convert.html`, `o ${(m.name || "mesh").replace(/\s+/g, "_")}`];
+  const out = [`# written by tools.katr.es`, `o ${(m.name || "mesh").replace(/\s+/g, "_")}`];
   for (const v of m.verts) out.push(`v ${v[0]} ${v[1]} ${v[2]}`);
   for (const f of m.faces) out.push("f " + f.map(i => i + 1).join(" "));
   return out.join("\n") + "\n";
@@ -168,7 +168,7 @@ export function meshToStl(m, opts){
   }
   const buf = new Uint8Array(84 + tris.length * 50);
   const dv = new DataView(buf.buffer);
-  buf.set(enc.encode("Binary STL written by convert.html").subarray(0, 80), 0);
+  buf.set(enc.encode("Binary STL written by tools.katr.es").subarray(0, 80), 0);
   dv.setUint32(80, tris.length, true);
   tris.forEach((t, i) => {
     const o = 84 + i * 50;

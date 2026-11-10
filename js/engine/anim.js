@@ -3,7 +3,7 @@
 import { canvasRGBA, resizeCanvas } from "./canvas.js";
 import { concatBytes, crc32, deflateZlib, enc } from "./util.js";
 
-export const ANIM_MIME = { gif:"image/gif", webp:"image/webp", avif:"image/avif", png:"image/png" };
+export const ANIM_MIME = { gif:"image/gif", webp:"image/webp", avif:"image/avif", png:"image/png", apng:"image/png" };
 
 export async function decodeFrames(blob, kind, limit){
   if (typeof ImageDecoder === "undefined") throw new Error("this browser has no ImageDecoder");

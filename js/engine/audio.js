@@ -262,7 +262,7 @@ export async function audioToOpus(buf, opts){
   new DataView(head.buffer).setInt16(16, 0, true);
   head[18] = 0;
 
-  const vendor = enc.encode("convert.html");
+  const vendor = enc.encode("tools.katr.es");
   const tags = new Uint8Array(8 + 4 + vendor.length + 4);
   tags.set(enc.encode("OpusTags"), 0);
   const tv = new DataView(tags.buffer);

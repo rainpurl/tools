@@ -1,6 +1,9 @@
 // Decode anything image shaped to a canvas, and encode a canvas back out.
 
-import { framesToGif } from "./anim.js";
+import { framesToApng, framesToGif } from "./anim.js";
+import { fontSpecimen } from "./fonts.js";
+import { avifEncode, bundlePicture, icnsEncode, jxlEncode, rawPreview } from "./imgextra.js";
+import { avDecodeImage } from "./media.js";
 import { MAX_AREA, MAX_DIM, bitmapToCanvas, canvasRGBA, vectorScale } from "./canvas.js";
 import {
   ddsDecode,
@@ -26,8 +29,8 @@ import {
   xpmDecode
 } from "./codecs.js";
 import { useModule } from "./modules.js";
-import { MIME } from "./registry.js";
-import { bytesToB64, concatBytes, decodeText, deflateZlib, enc, latin1 } from "./util.js";
+import { KINDS, MIME } from "./registry.js";
+import { bytesToB64, concatBytes, decodeText, deflateZlib, enc, gunzip, latin1 } from "./util.js";
 
 export async function svgRender(text, opts){
   const doc = new DOMParser().parseFromString(text, "image/svg+xml");
@@ -77,6 +80,11 @@ export async function svgRender(text, opts){
 export async function loadRaster(blob, kind, opts){
   opts = opts || {};
   if (kind === "svg") return svgRender(decodeText(new Uint8Array(await blob.arrayBuffer())), opts);
+  if (kind === "svgz") return svgRender(decodeText(await gunzip(new Uint8Array(await blob.arrayBuffer()))), opts);
+  if (kind === "raw") return rawPreview(blob);
+  if (kind === "ora" || kind === "kra" || kind === "iwork") return bundlePicture(blob, kind);
+  if (kind === "font") return fontSpecimen(new Uint8Array(await blob.arrayBuffer()), opts);
+  if (KINDS[kind] && KINDS[kind].module === "ffmpeg") return avDecodeImage(blob, kind, opts);
   if (kind === "eps") return epsRender(new Uint8Array(await blob.arrayBuffer()), opts);
   if (kind === "heic" || kind === "jxl"){
     try { return bitmapToCanvas(await createImageBitmap(blob)); } catch (e){ /* use module */ }
@@ -134,6 +142,10 @@ export async function canvasToBytes(canvas, target, quality){
   if (target === "eps") return epsEncode(canvas);
   if (target === "svg") return svgWrap(canvas);
   if (target === "gif") return framesToGif([{ canvas, delay: 100 }], { gifColors: 256 });
+  if (target === "apng") return framesToApng([{ canvas, delay: 100 }], {});
+  if (target === "avif") return avifEncode(canvas, quality);
+  if (target === "jxl") return jxlEncode(canvas, quality);
+  if (target === "icns") return icnsEncode(canvas);
   const type = MIME[target] || "image/png";
   const blob = await canvas.convertToBlob({ type, quality: quality });
   if (blob.type !== type && target !== "png"){
@@ -239,7 +251,7 @@ export async function epsEncode(canvas){
   const head = `%!PS-Adobe-3.0 EPSF-3.0
 %%BoundingBox: 0 0 ${w} ${h}
 %%HiResBoundingBox: 0 0 ${w} ${h}
-%%Creator: convert.html
+%%Creator: tools.katr.es
 %%LanguageLevel: 2
 %%Pages: 1
 %%EndComments

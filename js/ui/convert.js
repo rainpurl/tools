@@ -2,7 +2,8 @@
 
 import { MAX_DIM } from "../engine/canvas.js";
 import { zipWrite } from "../engine/containers.js";
-import { needsModuleFor } from "../engine/modules.js";
+import { TARGET_MODULE, needsModuleFor } from "../engine/modules.js";
+import { stopTools } from "../engine/wasmtools.js";
 import { GROUP_ORDER, KINDS, TARGETS, VECTOR_KINDS, canCombine, hubsOf, routeFor } from "../engine/registry.js";
 import { baseName, escHtml, fmtBytes, safeName } from "../engine/util.js";
 import { pool } from "../worker/pool.js";
@@ -294,7 +295,7 @@ function renderOpts(){
     field("imgMax", "Max dimension in px, 0 keeps original",
       `<input type="number" id="imgMax" min="0" step="16" value="${opt("imgMax", 0)}">`);
   }
-  if (["jpeg", "webp"].includes(t)){
+  if (["jpeg", "webp", "avif", "jxl"].includes(t)){
     const q = +opt("imgQuality", 0.88);
     add(`<label for="imgQuality">Quality</label><div class="range"><input type="range" id="imgQuality" min="0.3" max="1" step="0.01" value="${q}"><output>${Math.round(q * 100)}</output></div>`,
       d => {
@@ -367,13 +368,48 @@ function renderOpts(){
       `<input type="number" id="subFps" min="1" max="120" step="0.001" value="${opt("subFps", 23.976)}">`);
   }
 
+  const viaAv = hubs.has("av");
+  const toVideo = TARGETS[t].group === "Video";
+  head("Video");
+  if (toVideo){
+    select("videoQuality", "Quality", "medium", [["high", "High, larger file"], ["medium", "Medium"], ["low", "Low, smaller file"]]);
+    select("videoHeight", "Largest height", 0, [[0, "Keep the original"], [2160, "2160p"], [1440, "1440p"], [1080, "1080p"], [720, "720p"], [480, "480p"], [360, "360p"]]);
+    select("videoFps", "Frames per second", 0, [[0, "Keep the original"], [60, 60], [30, 30], [24, 24], [15, 15]]);
+    check("videoMute", "Leave the sound out", false);
+  }
+  if (viaAv && t === "gif"){
+    field("gifWidth", "Width of the GIF in px", `<input type="number" id="gifWidth" min="16" max="1920" step="10" value="${opt("gifWidth", 480)}">`);
+    select("videoFps", "Frames per second", 12, [[24, 24], [15, 15], [12, 12], [10, 10], [8, 8], [5, 5]]);
+  }
+  if (viaAv && t === "frames"){
+    select("videoFps", "Frames to take per second of video", 1, [[30, 30], [10, 10], [5, 5], [2, 2], [1, 1], [0.5, "one every 2 s"], [0.2, "one every 5 s"]]);
+  }
+  if (viaAv){
+    field("clipStart", "Start at, in seconds", `<input type="number" id="clipStart" min="0" step="0.1" value="${opt("clipStart", 0)}">`);
+    field("clipEnd", "End at, in seconds. 0 runs to the end", `<input type="number" id="clipEnd" min="0" step="0.1" value="${opt("clipEnd", 0)}">`);
+    note("Video and sound are converted on this device by ffmpeg, a 32 MB download the browser keeps after the first use. Long or high resolution clips take a while.");
+  }
+
   head("Audio");
   if (["wav", "aiff", "pcm"].includes(t)){
     select("wavBits", "Bit depth", 16, [16, 24, 32].map(b => [b, b === 32 ? (t === "aiff" ? "32 bit" : "32 float") : b + " bit"]));
   }
   if (t === "pcm") check("pcmLittleEndian", "Little endian byte order", true);
-  if (["opus", "aac"].includes(t)){
+  if (["opus", "aac", "mp3", "ogg", "m4a", "wma", "ac3"].includes(t) || (toVideo && !opt("videoMute", false))){
     select("audioBitrate", "Bitrate in kbps", 128000, [64, 96, 128, 160, 192, 256].map(b => [b * 1000, b]));
+  }
+
+  head("Archive");
+  const packed = [...kinds].some(k => KINDS[k].module === "sevenzip");
+  if (["sevenz", "txz", "tbz2", "xz", "bz2"].includes(t)){
+    select("archiveLevel", "Compression", "normal", [["fast", "Fast"], ["normal", "Normal"], ["small", "Smallest, slower"]]);
+  }
+  if ((packed && hubs.has("archive")) || t === "sevenz"){
+    field("archivePassword", t === "sevenz" && !packed ? "Password, blank for none" : "Password, if the archive has one",
+      `<input type="password" id="archivePassword" autocomplete="off" value="">`);
+  }
+  if (kinds.has("pdf") && t === "pptx"){
+    select("pdfSlides", "Slides from a PDF", "pictures", [["pictures", "Each page as a picture, exact"], ["text", "Text as editable slides"]]);
   }
 
   head("Output");
@@ -387,7 +423,7 @@ function renderOpts(){
       if (comb.hub === "table" && ["csv", "tsv"].includes(t)) check("combineSource", "Add a column naming each source file", true);
     }
   }
-  if (kinds.has("eml")) check("emlAttachments", "Also write mail attachments", true);
+  if (kinds.has("eml") || kinds.has("msg")) check("emlAttachments", "Also write mail attachments", true);
   check("allowModules", "Allow the optional module download when a format needs it", true);
 }
 
@@ -400,6 +436,8 @@ function runOpts(){
     gifColors: +opt("gifColors", 256), gifDelay: +opt("gifDelay", 100),
     gifLoop: opt("gifLoopForever", true) ? 0 : 1,
     frameLimit: +opt("frameLimit", 600), audioBitrate: +opt("audioBitrate", 128000),
+    videoHeight: +opt("videoHeight", 0), videoFps: +opt("videoFps", 0), gifWidth: +opt("gifWidth", 480),
+    clipStart: +opt("clipStart", 0), clipEnd: +opt("clipEnd", 0),
     vecSize: Math.max(0, +opt("vecSize", 4096) || 0),
     combineName: opt("combineName", "combined")
   };
@@ -411,9 +449,12 @@ function runOpts(){
 // stack or pdf.js stays on the page.
 const WORKER_HUBS = new Set(["raster", "anim", "mesh", "icons", "table", "tree"]);
 const ANY_KIND_HUBS = new Set(["bytes", "archive", "plain"]);
-const PAGE_KINDS = new Set(["svg", "eps", "heic", "xml", "xlsx", "gpx", "kml", "kmz", "ods", "html", "pdf"]);
-function workerCan(item, hub){
+const PAGE_KINDS = new Set(["svg", "svgz", "eps", "heic", "xml", "xlsx", "gpx", "kml", "kmz", "ods", "html", "pdf", "font", "m3mf"]);
+const PAGE_MODULES = new Set(["ffmpeg", "sevenzip", "woff2"]);
+function workerCan(item, hub, target){
   if (!pool.ok) return false;
+  // ffmpeg and 7-Zip have a worker of their own, started from the page
+  if (PAGE_MODULES.has(KINDS[item.kind].module) || PAGE_MODULES.has(TARGET_MODULE[target])) return false;
   if (ANY_KIND_HUBS.has(hub)) return true;
   return WORKER_HUBS.has(hub) && !PAGE_KINDS.has(item.kind);
 }
@@ -541,7 +582,7 @@ async function run(){
     try {
       let outs;
       const here = () => onPage(() => E.convertItem(item, t, opts));
-      if (workerCan(item, route)){
+      if (workerCan(item, route, t)){
         try {
           outs = await pool.run("convert",
             { file: item.file, kind: item.kind, outBase: item.outBase, target: t, opts: plain },
@@ -629,6 +670,7 @@ $("stop").onclick = () => {
   if (!state.running) return;
   state.cancel = true;
   pool.cancel();
+  stopTools();
   log("Stopping.", "w");
 };
 $("go").onclick = () => run().catch(e => { log("Fatal: " + (e.stack || e.message), "e"); done(); });

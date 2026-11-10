@@ -1,6 +1,6 @@
 // The conversion engine: build a shared shape from a file, then write the target from it.
 
-import { decodeFrames, framesToGif } from "./anim.js";
+import { decodeFrames, framesToApng, framesToGif } from "./anim.js";
 import {
   aiffDecode,
   audioToAac,
@@ -10,7 +10,7 @@ import {
   audioToWav,
   decodeAudio
 } from "./audio.js";
-import { resizeCanvas } from "./canvas.js";
+import { bitmapToCanvas, resizeCanvas } from "./canvas.js";
 import { icnsEntries } from "./codecs.js";
 import { ZipReader, tarRead, tarWrite, zipWrite } from "./containers.js";
 import {
@@ -67,14 +67,14 @@ import {
   offDecode,
   stlDecode
 } from "./mesh.js";
-import { MODULES, MODULE_HUBS } from "./modules.js";
+import { MODULES, MODULE_HUBS, TARGET_MODULE } from "./modules.js";
 import { htmlToOdt, odfOpen, odpToHtml, odsToSheets, odtToHtml, sheetsToOds } from "./odf.js";
 import { htmlToDocx, htmlToRtf } from "./docwrite.js";
 import { docxToHtml, pptxToHtml, sheetsToXlsx, xlsxToSheets } from "./office.js";
 import { loadPdfDoc, pdfToCanvases, pdfToHtml } from "./pdfread.js";
 import { htmlToPdf, imagesToPdf } from "./pdfwrite.js";
 import { canvasToBytes, epsToPdf, loadRaster } from "./raster.js";
-import { KINDS, MIME, TARGETS, VECTOR_KINDS, canCombine, routeFor } from "./registry.js";
+import { KINDS, MIME, TARGETS, VECTOR_KINDS, canCombine, hubsOf, routeFor } from "./registry.js";
 import { htmlDoc, htmlToMd, htmlToText, mdToHtml } from "./rich.js";
 import { rtfToHtml } from "./rtf.js";
 import {
@@ -115,6 +115,16 @@ import {
   utf8
 } from "./util.js";
 
+import { cfbKind, docToHtml, parseMsg, pptToHtml, xlsToSheets } from "./cfb.js";
+import { bibToSheets, npyToSheets, parquetToSheets, risToSheets, sheetsToBib, sheetsToRis } from "./dataextra.js";
+import { mboxSplit, xpsToHtml } from "./docextra.js";
+import { fontExt, fontTo, readFonts } from "./fonts.js";
+import { avConvert, sevenCreate, sevenExtract } from "./media.js";
+import { glbDecode, meshToGlb, meshToPly, plyDecode, threeMfDecode } from "./meshextra.js";
+import { canvasSlide, htmlToSlides, slidesToPptx } from "./slides.js";
+
+const IMAGE_NAME = /\.(png|jpe?g|gif|webp|bmp|avif)$/i;
+
 export async function getHub(item, hub, opts){
   item._hub = item._hub || {};
   const key = hub === "raster" && VECTOR_KINDS.has(item.kind) ? "raster@" + (+opts.vecSize || 0) : hub;
@@ -150,7 +160,12 @@ export async function buildHub(item, hub, opts){
   if (hub === "pdf") return loadPdfDoc(item.file);
   if (hub === "anim") return decodeFrames(item.file, kind, opts.frameLimit || 600);
   if (hub === "icons") return icnsEntries(await rawBytes(item));
+  if (hub === "av") return item;
+  if (hub === "font") return readFonts(await rawBytes(item), opts);
   if (hub === "mesh"){
+    if (kind === "ply") return plyDecode(await rawBytes(item), name);
+    if (kind === "glb") return glbDecode(await rawBytes(item), name);
+    if (kind === "m3mf") return threeMfDecode(item.file, name);
     if (kind === "obj") return objDecode(await rawText(item), name);
     if (kind === "off") return offDecode(await rawText(item), name);
     if (kind === "stl") return stlDecode(await rawBytes(item), name);
@@ -158,7 +173,9 @@ export async function buildHub(item, hub, opts){
   }
 
   if (hub === "archive"){
-    if (kind === "zip"){
+    if (KINDS[kind].module === "sevenzip") return sevenExtract(item.file, kind, opts);
+    if (kind === "mbox") return mboxSplit(await rawBytes(item));
+    if (KINDS[kind].zip || kind === "kmz"){
       const z = new ZipReader(item.file);
       await z.open();
       const out = [];
@@ -203,7 +220,12 @@ export async function buildHub(item, hub, opts){
   }
 
   if (hub === "table"){
+    if (kind === "xls") return xlsToSheets(await rawBytes(item), opts);
+    if (kind === "parquet") return parquetToSheets(await rawBytes(item), name, opts);
+    if (kind === "npy") return npyToSheets(await rawBytes(item), name);
     const text = kind === "xlsx" ? null : await rawText(item);
+    if (kind === "bib") return bibToSheets(text, name);
+    if (kind === "ris") return risToSheets(text, name);
     const header = opts.hasHeader !== false;
     if (kind === "csv")  return [rowsToSheet(parseDelimited(text, opts.delimIn || null), name, header)];
     if (kind === "tsv")  return [rowsToSheet(parseDelimited(text, "\t"), name, header)];
@@ -274,6 +296,20 @@ export async function buildHub(item, hub, opts){
       item._eml = p;
       return emlToHtml(p);
     }
+    if (kind === "msg"){
+      const p = parseMsg(await rawBytes(item));
+      item._eml = p;
+      return emlToHtml(p);
+    }
+    if (kind === "doc" || kind === "xls" || kind === "ppt"){
+      // the extension is not always the truth for these
+      const bytes = await rawBytes(item);
+      const real = cfbKind(bytes) || kind;
+      if (real === "ppt") return pptToHtml(bytes);
+      if (real === "doc") return docToHtml(bytes, name);
+      throw new Error("this file is not a Word or PowerPoint document");
+    }
+    if (kind === "xps") return xpsToHtml(item.file, name);
     throw new Error("no document representation");
   }
   throw new Error("unknown hub " + hub);
@@ -292,6 +328,7 @@ export async function emitRich(html, target, opts, one){
   if (target === "rst")    return one(enc.encode(htmlToRst(html, opts.docTitle || "")));
   if (target === "bbcode") return one(enc.encode(htmlToBbcode(html)));
   if (target === "pdf")  return one(await htmlToPdf(html, opts));
+  if (target === "pptx") return one(await slidesToPptx(htmlToSlides(html, opts.docTitle || "")));
   return null;
 }
 
@@ -312,7 +349,52 @@ export async function convertItem(item, target, opts){
 
   if (item.kind === "eps" && target === "pdf") return one(await epsToPdf(await rawBytes(item), opts));
 
-  const val = await getHub(item, hub, opts);
+  const tm = TARGET_MODULE[target];
+  if (tm && !MODULES[tm].loaded){
+    if (!opts.allowModules) throw new Error(`needs the optional ${MODULES[tm].label} module`);
+    if (typeof opts.notify === "function" && tm !== "sevenzip") opts.notify(`  loading ${MODULES[tm].label} (${MODULES[tm].size})`);
+  }
+
+  if (hub === "av") return avConvert({ ...item, outBase: base }, target, opts);
+
+  let val;
+  try { val = await getHub(item, hub, opts); }
+  catch (e){
+    // sound the browser cannot decode goes to ffmpeg instead
+    if (hub === "audio" && def.via.includes("av") && hubsOf(item.kind).includes("av") && opts.allowModules !== false){
+      return avConvert({ ...item, outBase: base }, target, opts);
+    }
+    throw e;
+  }
+
+  if (hub === "font"){
+    const many = val.length > 1;
+    const outs = [];
+    for (const [i, font] of val.entries()){
+      const ext = target === "sfnt" ? fontExt(font) : target;
+      outs.push({ name: `${base}${many ? "-" + (i + 1) : ""}.${ext}`, bytes: await fontTo(font, target, opts), mime: target === "sfnt" ? "font/" + ext : MIME[target] });
+    }
+    return outs;
+  }
+
+  if (hub === "pdf" && target === "pptx" && opts.pdfSlides !== "text"){
+    const slides = [];
+    for (const c of await pdfToCanvases(val, 2)) slides.push(await canvasSlide(c, true));
+    return one(await slidesToPptx(slides));
+  }
+
+  if (hub === "archive" && target === "pdf"){
+    const pics = val.filter(m => IMAGE_NAME.test(m.name) && !/(^|\/)(__MACOSX|\.)/.test(m.name))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    if (!pics.length) throw new Error("there are no pictures in this archive to make pages from");
+    const canvases = [];
+    for (const m of pics){
+      try { canvases.push(bitmapToCanvas(await createImageBitmap(new Blob([m.bytes])))); }
+      catch (e){ /* a picture the browser cannot read is left out */ }
+    }
+    if (!canvases.length) throw new Error("none of the pictures in this archive could be read");
+    return one(await imagesToPdf(canvases, { ...opts, fitPage: "image" }));
+  }
 
   if (target === "files" && (hub === "archive" || hub === "pdf")){
     if (hub === "archive") return val.map(m => ({ name: safeName(m.name.split("/").pop()) || "file", path: m.name, bytes: m.bytes, mime: "application/octet-stream" }));
@@ -343,6 +425,7 @@ export async function convertItem(item, target, opts){
 
   if (hub === "anim"){
     if (target === "gif") return one(await framesToGif(val, opts));
+    if (target === "apng") return one(await framesToApng(val, opts));
     if (target === "frames"){
       const outs = [];
       for (const [i, f] of val.entries()){
@@ -371,6 +454,8 @@ export async function convertItem(item, target, opts){
     if (target === "obj") return one(enc.encode(meshToObj(val)));
     if (target === "off") return one(enc.encode(meshToOff(val)));
     if (target === "stl") return one(meshToStl(val, opts));
+    if (target === "ply") return one(meshToPly(val));
+    if (target === "glb") return one(meshToGlb(val));
     if (["png","jpeg","webp"].includes(target)){
       return one(await canvasToBytes(meshToCanvas(val, opts), target, +opts.imgQuality || 0.9));
     }
@@ -382,6 +467,7 @@ export async function convertItem(item, target, opts){
       const flat = target === "jpeg" || target === "bmp" || target === "eps";
       const canvas = resizeCanvas(val, opts.imgMax || 0, flat ? (opts.imgBg || "#ffffff") : null);
       if (target === "pdf") return one(await imagesToPdf([canvas], opts));
+      if (target === "pptx") return one(await slidesToPptx([await canvasSlide(canvas, false)]));
       return one(await canvasToBytes(canvas, target, opts.imgQuality));
     }
 
@@ -414,6 +500,8 @@ export async function convertItem(item, target, opts){
       if (target === "kml")    return one(enc.encode(sheetsToKml(sheets)));
       if (target === "ics")    return one(enc.encode(sheetsToIcs(sheets)));
       if (target === "vcf")    return one(enc.encode(sheetsToVcf(sheets)));
+      if (target === "bib")    return one(enc.encode(sheetsToBib(sheets)));
+      if (target === "ris")    return one(enc.encode(sheetsToRis(sheets)));
       if (target === "md")    return one(enc.encode(sheetsToMarkdown(sheets)));
       if (target === "html")  return one(enc.encode(sheetsToHtml(sheets, base)));
       if (target === "txt")   return one(enc.encode(sheetsToText(sheets)));
@@ -477,6 +565,7 @@ export async function convertItem(item, target, opts){
       if (target === "zip")  return one(await zipWrite(members));
       if (target === "tar")  return one(tarWrite(members));
       if (target === "tgz")  return one(await gzip(tarWrite(members)));
+      if (target === "sevenz" || target === "txz" || target === "tbz2") return one(await sevenCreate(members, target, opts));
       break;
     }
 
@@ -491,6 +580,10 @@ export async function convertItem(item, target, opts){
       if (target === "zip")     return one(await zipWrite([{ name: safeName(item.file.name), bytes }]));
       if (target === "tar")     return one(tarWrite([{ name: safeName(item.file.name), bytes }]));
       if (target === "tgz")     return one(await gzip(tarWrite([{ name: safeName(item.file.name), bytes }])));
+      if (target === "sevenz" || target === "txz" || target === "tbz2") return one(await sevenCreate([{ name: safeName(item.file.name), bytes }], target, opts));
+      if (target === "xz" || target === "bz2"){
+        return [{ name: safeName(item.file.name) + "." + target, bytes: await sevenCreate([{ name: safeName(item.file.name), bytes }], target, opts), mime: MIME[target] }];
+      }
       if (target === "base64")  return one(enc.encode(bytesToB64(bytes).replace(/(.{76})/g, "$1\n") + "\n"));
       if (target === "base32")  return one(enc.encode(bytesToB32(bytes).replace(/(.{76})/g, "$1\n") + "\n"));
       if (target === "urlenc")  return one(enc.encode(bytesToUrlEnc(bytes) + "\n"));
@@ -534,6 +627,7 @@ export async function convertCombined(items, target, opts, onProgress){
     if (target === "zip") return one(await zipWrite(members));
     if (target === "tar") return one(tarWrite(members));
     if (target === "tgz") return one(await gzip(tarWrite(members)));
+    if (target === "sevenz" || target === "txz" || target === "tbz2") return one(await sevenCreate(members, target, opts));
   }
 
   if (hub === "raster" || hub === "anim"){
@@ -546,6 +640,11 @@ export async function convertCombined(items, target, opts, onProgress){
       }
     }
     if (target === "pdf") return one(await imagesToPdf(frames.map(f => f.canvas), opts));
+    if (target === "pptx"){
+      const slides = [];
+      for (const f of frames) slides.push(await canvasSlide(f.canvas, false));
+      return one(await slidesToPptx(slides));
+    }
     if (target === "gif"){
       const w = frames[0].canvas.width, h = frames[0].canvas.height;
       const norm = frames.map(f => {

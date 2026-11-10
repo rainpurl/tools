@@ -1,7 +1,8 @@
 // Work out what a file is from its bytes first and its name second.
 
 import { ZipReader } from "./containers.js";
-import { EXT2KIND } from "./registry.js";
+import { cfbKind } from "./cfb.js";
+import { EXT2KIND, KINDS } from "./registry.js";
 import { decodeText, extOf, latin1, utf8 } from "./util.js";
 
 export function sniff(u8){
@@ -22,8 +23,34 @@ export function sniff(u8){
       const brands = latin1.decode(b.subarray(8, Math.min(b.length, 64)));
       return /avi[fs]/.test(brands) ? "avif" : "heic";
     }
-    if (brand === "M4A " || brand.startsWith("mp4") || brand.startsWith("isom")) return "audio";
+    if (brand === "crx ") return "raw";
+    if (/^M4[ABP] $/.test(brand)) return "audio";
+    return "mp4ish";
   }
+  if (has(0, 0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c)) return "sevenz";
+  if (has(0, 0x52, 0x61, 0x72, 0x21, 0x1a, 0x07)) return "rar";
+  if (has(0, 0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00)) return "xz";
+  if (has(0, 0x42, 0x5a, 0x68) && b[3] >= 0x31 && b[3] <= 0x39) return "bz2";
+  if (has(0, 0x28, 0xb5, 0x2f, 0xfd)) return "zst";
+  if (has(0, 0x4d, 0x53, 0x43, 0x46)) return "cab";
+  if (has(0, 0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1)) return "cfb";
+  if (has(0, 0x52, 0x49, 0x46, 0x46) && has(8, 0x41, 0x56, 0x49, 0x20)) return "video";
+  if (has(0, 0x1a, 0x45, 0xdf, 0xa3)) return "ebml";
+  if (has(0, 0x46, 0x4c, 0x56, 0x01)) return "video";
+  if (has(0, 0x30, 0x26, 0xb2, 0x75, 0x8e, 0x66, 0xcf, 0x11)) return "asf";
+  if (has(0, 0x00, 0x00, 0x01, 0xba) || has(0, 0x00, 0x00, 0x01, 0xb3)) return "video";
+  if (has(0, 0x4f, 0x54, 0x54, 0x4f) || has(0, 0x77, 0x4f, 0x46, 0x46) || has(0, 0x77, 0x4f, 0x46, 0x32) ||
+      has(0, 0x74, 0x74, 0x63, 0x66) || has(0, 0x74, 0x72, 0x75, 0x65)) return "font";
+  if (has(0, 0x00, 0x01, 0x00, 0x00, 0x00) && b[5] >= 4 && b[5] <= 80) return "font";
+  if (has(0, 0x00, 0x00, 0x00, 0x0c, 0x6a, 0x50, 0x20, 0x20) || has(0, 0xff, 0x4f, 0xff, 0x51)) return "jp2";
+  if (has(0, 0x76, 0x2f, 0x31, 0x01)) return "exr";
+  if (has(0, 0x53, 0x44, 0x50, 0x58) || has(0, 0x58, 0x50, 0x44, 0x53)) return "dpx";
+  if (b[0] === 0x93 && has(1, 0x4e, 0x55, 0x4d, 0x50, 0x59)) return "npy";
+  if (has(0, 0x50, 0x41, 0x52, 0x31)) return "parquet";
+  if (has(0, 0x70, 0x6c, 0x79) && (b[3] === 0x0a || b[3] === 0x0d)) return "ply";
+  if (has(0, 0x67, 0x6c, 0x54, 0x46)) return "glb";
+  if (has(0, 0x21, 0x3c, 0x61, 0x72, 0x63, 0x68, 0x3e) || has(0, 0xed, 0xab, 0xee, 0xdb) || has(0, 0x30, 0x37, 0x30, 0x37, 0x30)) return "pkg";
+  if (has(0, 0x4d, 0x53, 0x57, 0x49, 0x4d)) return "iso";
   if (has(0, 0xff, 0x0a) || has(0, 0x00, 0x00, 0x00, 0x0c, 0x4a, 0x58, 0x4c, 0x20)) return "jxl";
   if (has(0, 0x25, 0x50, 0x44, 0x46)) return "pdf";
   if (has(0, 0xc5, 0xd0, 0xd3, 0xc6) || has(0, 0x25, 0x21, 0x50, 0x53)) return "eps";
@@ -44,7 +71,7 @@ export function sniff(u8){
   if (has(0, 0x1f, 0x8b)) return "gz";
   if (has(0, 0x49, 0x44, 0x33) || (b[0] === 0xff && (b[1] & 0xe0) === 0xe0)) return "audio";
   if (has(0, 0x66, 0x4c, 0x61, 0x43)) return "audio";
-  if (has(0, 0x4f, 0x67, 0x67, 0x53)) return "audio";
+  if (has(0, 0x4f, 0x67, 0x67, 0x53)) return "ogg";
   if (has(0, 0x7b, 0x5c, 0x72, 0x74)) return "rtf";
   if (b.length > 262 && has(257, 0x75, 0x73, 0x74, 0x61, 0x72)) return "tar";
   if (has(0, 0x50, 0x4b, 0x03, 0x04)) return "zipish";
@@ -56,8 +83,30 @@ export async function detectKind(file, head){
   const byExt = EXT2KIND.get(ext);
   const magic = sniff(head);
 
+  // containers that hold more than one kind of thing are told apart by their name
+  if (magic === "mp4ish") return byExt === "audio" || byExt === "raw" ? byExt : "video";
+  if (magic === "ebml") return byExt === "audio" ? "audio" : "video";
+  if (magic === "asf") return byExt === "audiox" ? "audiox" : "video";
+  if (magic === "ogg") return byExt === "video" ? "video" : "audio";
+  if (magic === "cfb"){
+    if (byExt && ["doc", "xls", "ppt", "msg", "pkg"].includes(byExt)) return byExt;
+    return cfbKind(new Uint8Array(await file.arrayBuffer())) || byExt || "bin";
+  }
+  if (byExt && KINDS[byExt].byExt && !["doc", "xls", "ppt", "msg"].includes(byExt) && (!magic || magic === "tiff" || magic === "gz" || magic === "jpeg")) return byExt;
+  if (magic === "png"){
+    // an animated PNG says so in a chunk ahead of its first picture data
+    const dv = new DataView(head.buffer, head.byteOffset, head.byteLength);
+    for (let p = 8; p + 12 <= head.length;){
+      const type = latin1.decode(head.subarray(p + 4, p + 8));
+      if (type === "acTL") return "apng";
+      if (type === "IDAT") break;
+      p += 12 + dv.getUint32(p);
+    }
+    return "png";
+  }
+
   if (magic === "zipish"){
-    if (byExt && ["docx","pptx","xlsx","odt","ods","odp","epub","kmz","zip"].includes(byExt)) return byExt;
+    if (byExt && (KINDS[byExt].zip || ["odt","ods","odp","epub","kmz"].includes(byExt))) return byExt;
     try {
       const z = new ZipReader(file);
       await z.open();
@@ -68,7 +117,12 @@ export async function detectKind(file, head){
         if (t === "application/vnd.oasis.opendocument.text") return "odt";
         if (t === "application/vnd.oasis.opendocument.spreadsheet") return "ods";
         if (t === "application/vnd.oasis.opendocument.presentation") return "odp";
+        if (t === "image/openraster") return "ora";
+        if (t === "application/x-krita") return "kra";
       }
+      if (z.find("3D/3dmodel.model")) return "m3mf";
+      if (z.entries.some(e => /\.fpage$/i.test(e.name))) return "xps";
+      if (z.find("Index/Document.iwa") || z.find("index.apxl")) return "iwork";
       if (z.find("word/document.xml")) return "docx";
       if (z.find("xl/workbook.xml")) return "xlsx";
       if (z.find("ppt/presentation.xml")) return "pptx";
@@ -117,6 +171,9 @@ export async function detectKind(file, head){
     return "xml";
   }
   if (/^<(!doctype html|html)[\s>]/i.test(txt)) return "html";
+  if (/^From \S+.*\d{4}\s*(\n|$)/.test(txt) && /^(Subject|Date|To|Received):/im.test(txt)) return "mbox";
+  if (/^\s*@[A-Za-z]+\s*\{\s*[^,\s{}]+\s*,/.test(txt) && /=\s*[{"\d]/.test(txt)) return "bib";
+  if (/^TY  - [A-Z]+\s*$/m.test(txt) && /^ER  -/m.test(txt)) return "ris";
   if (/^[CN]?OFF\s/i.test(txt)) return "off";
   if (/^\s*solid/i.test(txt) && /^\s*facet\s+normal/im.test(txt)) return "stl";
   if (/^v\s+-?[\d.]/m.test(txt) && /^f\s+\d/m.test(txt)) return "obj";

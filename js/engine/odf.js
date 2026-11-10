@@ -211,7 +211,7 @@ ${extra || ""}
 export function odfMeta(title){
   return `<?xml version="1.0" encoding="UTF-8"?>
 <office:document-meta ${ODF_NS} xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0">
-<office:meta><dc:title>${xmlEsc(title || "Document")}</dc:title><meta:generator>convert.html</meta:generator></office:meta>
+<office:meta><dc:title>${xmlEsc(title || "Document")}</dc:title><meta:generator>tools.katr.es</meta:generator></office:meta>
 </office:document-meta>`;
 }
 

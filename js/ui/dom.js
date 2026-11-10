@@ -19,7 +19,7 @@ export const store = {
 
 // Options are remembered between visits. A few describe one job, not a habit,
 // so they start fresh every time.
-const ONE_OFF = new Set(["combine", "combineName", "pdfName", "delimIn",
+const ONE_OFF = new Set(["combine", "combineName", "pdfName", "delimIn", "archivePassword", "clipStart", "clipEnd", "videoFps",
   "cropTop", "cropRight", "cropBottom", "cropLeft"]);
 const savedOpts = store.get("opts", {});
 for (const k of Object.keys(savedOpts)) if (ONE_OFF.has(k)) delete savedOpts[k];

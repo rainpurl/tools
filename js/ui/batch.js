@@ -12,7 +12,7 @@ const bState = { items: [], results: [], running: false, cancel: false };
 const bLog = makeLog($("bLog"));
 
 // These need the document to decode, so they are handled on the page, one at a time.
-const PAGE_KINDS = new Set(["svg", "eps", "heic"]);
+const PAGE_KINDS = new Set(["svg", "svgz", "eps", "heic", "font", "jp2", "exr", "dpx", "ffimg"]);
 
 // The image code is only fetched for the page when a file cannot go to a worker.
 let opsPromise = null;

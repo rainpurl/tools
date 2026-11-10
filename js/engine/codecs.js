@@ -377,7 +377,7 @@ export function pnmDecode(u8){
 export function pnmEncode(canvas, gray){
   const w = canvas.width, h = canvas.height;
   const px = canvasRGBA(canvas);
-  const header = enc.encode(`P${gray ? 5 : 6}\n# written by convert.html\n${w} ${h}\n255\n`);
+  const header = enc.encode(`P${gray ? 5 : 6}\n# written by tools.katr.es\n${w} ${h}\n255\n`);
   const body = new Uint8Array(w * h * (gray ? 1 : 3));
   for (let i = 0, o = 0; i < px.length; i += 4){
     const a = px[i + 3] / 255;

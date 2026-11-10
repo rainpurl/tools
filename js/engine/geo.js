@@ -174,7 +174,7 @@ export function sheetsToGpx(sheets){
   }).filter(Boolean);
   if (!pts.length) throw new Error("no rows had usable coordinates");
   return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="convert.html" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="tools.katr.es" xmlns="http://www.topografix.com/GPX/1/1">
 ${pts.join("\n")}
 </gpx>
 `;

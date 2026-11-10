@@ -3,12 +3,14 @@
 export const KINDS = {
   png:   { label:"PNG",       ext:["png"],                       hubs:["raster","bytes"] },
   jpeg:  { label:"JPEG",      ext:["jpg","jpeg","jpe","jfif"],   hubs:["raster","bytes"] },
-  webp:  { label:"WebP",      ext:["webp"],                      hubs:["anim","raster","bytes"] },
-  gif:   { label:"GIF",       ext:["gif"],                       hubs:["anim","raster","bytes"] },
+  apng:  { label:"Animated PNG", ext:["apng"],                   hubs:["anim","raster","bytes"], moduleHubs:["av"] },
+  webp:  { label:"WebP",      ext:["webp"],                      hubs:["anim","raster","bytes"], moduleHubs:["av"] },
+  gif:   { label:"GIF",       ext:["gif"],                       hubs:["anim","raster","bytes"], moduleHubs:["av"] },
   bmp:   { label:"BMP",       ext:["bmp","dib"],                 hubs:["raster","bytes"] },
   avif:  { label:"AVIF",      ext:["avif"],                      hubs:["anim","raster","bytes"] },
   ico:   { label:"ICO",       ext:["ico","cur"],                 hubs:["raster","bytes"] },
   svg:   { label:"SVG",       ext:["svg"],                       hubs:["raster","plain","bytes"] },
+  svgz:  { label:"SVGZ",      ext:["svgz"],                      hubs:["raster","bytes"], byExt:true },
   eps:   { label:"EPS",       ext:["eps","epsf","epsi","ps","ai"], hubs:["raster","bytes"], module:"ghostscript" },
   heic:  { label:"HEIC",      ext:["heic","heif","hif"],         hubs:["raster","bytes"], module:"heif" },
   jxl:   { label:"JPEG XL",   ext:["jxl"],                       hubs:["raster","bytes"], module:"jxl" },
@@ -28,9 +30,22 @@ export const KINDS = {
   pcx:   { label:"PCX",       ext:["pcx"],                       hubs:["raster","bytes"] },
   icns:  { label:"ICNS",      ext:["icns"],                      hubs:["raster","icons","bytes"] },
   psd:   { label:"PSD",       ext:["psd","psb"],                 hubs:["raster","bytes"] },
+  raw:   { label:"Camera RAW", ext:["cr2","cr3","crw","nef","nrw","arw","srf","sr2","dng","orf","rw2","pef","raf","srw",
+                                   "x3f","erf","kdc","dcr","mrw","3fr","iiq","rwl","mos","mef"], hubs:["raster","bytes"], byExt:true },
+  jp2:   { label:"JPEG 2000", ext:["jp2","j2k","jpf","jpx","j2c","jpc"], hubs:["raster","bytes"], module:"ffmpeg" },
+  exr:   { label:"OpenEXR",   ext:["exr"],                       hubs:["raster","bytes"], module:"ffmpeg" },
+  dpx:   { label:"DPX",       ext:["dpx","cin"],                 hubs:["raster","bytes"], module:"ffmpeg" },
+  ffimg: { label:"Image",     ext:["xwd","pam","fits","fit","fts","jls","pgx","pic","sr"], hubs:["raster","bytes"], module:"ffmpeg" },
+  ora:   { label:"OpenRaster", ext:["ora"],                      hubs:["raster","archive","bytes"], zip:true },
+  kra:   { label:"Krita",     ext:["kra"],                       hubs:["raster","archive","bytes"], zip:true },
+  iwork: { label:"iWork",     ext:["pages","numbers","key"],     hubs:["raster","archive","bytes"], zip:true },
+  font:  { label:"Font",      ext:["ttf","otf","woff","woff2","ttc"], hubs:["font","raster","bytes"] },
   obj:   { label:"OBJ",       ext:["obj"],                       hubs:["mesh","table","plain","bytes"] },
   off:   { label:"OFF",       ext:["off"],                       hubs:["mesh","table","plain","bytes"] },
   stl:   { label:"STL",       ext:["stl"],                       hubs:["mesh","table","bytes"] },
+  ply:   { label:"PLY",       ext:["ply"],                       hubs:["mesh","table","bytes"] },
+  glb:   { label:"glTF binary", ext:["glb"],                     hubs:["mesh","table","bytes"] },
+  m3mf:  { label:"3MF",       ext:["3mf"],                       hubs:["mesh","table","archive","bytes"], zip:true },
 
   csv:   { label:"CSV",       ext:["csv"],                       hubs:["table","plain","bytes"] },
   tsv:   { label:"TSV",       ext:["tsv","tab"],                 hubs:["table","plain","bytes"] },
@@ -53,6 +68,11 @@ export const KINDS = {
   cbor:  { label:"CBOR",      ext:["cbor"],                      hubs:["tree","table","bytes"] },
   bson:  { label:"BSON",      ext:["bson"],                      hubs:["tree","table","bytes"] },
   bplist:{ label:"Binary plist", ext:["bplist"],                hubs:["tree","table","bytes"] },
+  xls:   { label:"XLS",       ext:["xls","xlt","xla"],           hubs:["table","bytes"], byExt:true },
+  parquet:{ label:"Parquet",  ext:["parquet","pq"],              hubs:["table","bytes"], module:"parquet" },
+  npy:   { label:"NumPy",     ext:["npy"],                       hubs:["table","bytes"] },
+  bib:   { label:"BibTeX",    ext:["bib","bibtex"],              hubs:["table","plain","bytes"] },
+  ris:   { label:"RIS",       ext:["ris"],                       hubs:["table","plain","bytes"] },
 
   md:    { label:"Markdown",  ext:["md","markdown","mdown","mkd"], hubs:["rich","plain","bytes"] },
   html:  { label:"HTML",      ext:["html","htm","xhtml","sht","shtm","shtml"], hubs:["rich","table","plain","bytes"] },
@@ -63,9 +83,13 @@ export const KINDS = {
                                    "css","scss","less","sql","graphql","dockerfile","makefile",
                                    "diff","patch"], hubs:["rich","plain","bytes"] },
   rtf:   { label:"RTF",       ext:["rtf"],                       hubs:["rich","bytes"] },
-  docx:  { label:"DOCX",      ext:["docx","docm"],                hubs:["rich","bytes"] },
-  pptx:  { label:"PPTX",      ext:["pptx","pptm"],                hubs:["rich","bytes"] },
-  xlsx:  { label:"XLSX",      ext:["xlsx","xlsm"],                hubs:["table","bytes"] },
+  docx:  { label:"DOCX",      ext:["docx","docm","dotx","dotm"],  hubs:["rich","bytes"], zip:true },
+  doc:   { label:"DOC",       ext:["doc","dot"],                  hubs:["rich","bytes"], byExt:true },
+  pptx:  { label:"PPTX",      ext:["pptx","pptm","ppsx","ppsm","potx"], hubs:["rich","bytes"], zip:true },
+  ppt:   { label:"PPT",       ext:["ppt","pps","pot"],            hubs:["rich","bytes"], byExt:true },
+  xlsx:  { label:"XLSX",      ext:["xlsx","xlsm","xltx","xltm"],  hubs:["table","bytes"], zip:true },
+  xps:   { label:"XPS",       ext:["xps","oxps"],                 hubs:["rich","archive","bytes"], zip:true },
+  msg:   { label:"Outlook message", ext:["msg"],                  hubs:["rich","bytes"], byExt:true },
   odt:   { label:"ODT",       ext:["odt","ott"],                  hubs:["rich","bytes"] },
   ods:   { label:"ODS",       ext:["ods","ots"],                  hubs:["table","bytes"] },
   odp:   { label:"ODP",       ext:["odp","otp"],                  hubs:["rich","bytes"] },
@@ -75,12 +99,23 @@ export const KINDS = {
   ipynb: { label:"Notebook",  ext:["ipynb"],                      hubs:["rich","bytes"] },
   mhtml: { label:"MHTML",     ext:["mht","mhtml","mhtm"],        hubs:["rich","bytes"] },
 
-  zip:   { label:"ZIP",       ext:["zip"],                       hubs:["archive","bytes"] },
+  zip:   { label:"ZIP",       ext:["zip","jar","war","ear","apk","ipa","xpi","nupkg","whl","aar","vsix"], hubs:["archive","bytes"], zip:true },
+  cbz:   { label:"Comic book", ext:["cbz"],                      hubs:["archive","bytes"], zip:true },
+  sevenz:{ label:"7z",        ext:["7z","cb7"],                  hubs:["archive","bytes"], module:"sevenzip" },
+  rar:   { label:"RAR",       ext:["rar","cbr"],                 hubs:["archive","bytes"], module:"sevenzip" },
+  xz:    { label:"XZ",        ext:["xz","txz","lzma","tlz"],     hubs:["archive","bytes"], module:"sevenzip" },
+  bz2:   { label:"Bzip2",     ext:["bz2","tbz2","tbz","bz"],     hubs:["archive","bytes"], module:"sevenzip" },
+  zst:   { label:"Zstandard", ext:["zst","tzst"],                hubs:["archive","bytes"], module:"sevenzip" },
+  cab:   { label:"CAB",       ext:["cab"],                       hubs:["archive","bytes"], module:"sevenzip" },
+  iso:   { label:"Disk image", ext:["iso","img","udf","vhd","vhdx","vdi","vmdk","qcow2","dmg","wim","esd","squashfs","sqfs"], hubs:["archive","bytes"], module:"sevenzip" },
+  pkg:   { label:"Package",   ext:["deb","rpm","cpio","msi","chm","ar"], hubs:["archive","bytes"], module:"sevenzip" },
+  oldarc:{ label:"Legacy archive", ext:["arj","lzh","lha","z","taz"], hubs:["archive","bytes"], module:"sevenzip" },
   tar:   { label:"TAR",       ext:["tar"],                       hubs:["archive","bytes"] },
   gz:    { label:"Gzip",      ext:["gz"],                        hubs:["archive","bytes"] },
   tgz:   { label:"TGZ",       ext:["tgz"],                       hubs:["archive","bytes"] },
 
-  eml:   { label:"EML",       ext:["eml","mbox"],                hubs:["rich","bytes"] },
+  eml:   { label:"EML",       ext:["eml"],                       hubs:["rich","bytes"] },
+  mbox:  { label:"Mbox",      ext:["mbox","mbx"],                hubs:["archive","plain","bytes"] },
   ics:   { label:"ICS",       ext:["ics","ical","ifb"],          hubs:["table","plain","bytes"] },
   vcf:   { label:"vCard",     ext:["vcf","vcard"],               hubs:["table","plain","bytes"] },
 
@@ -92,9 +127,13 @@ export const KINDS = {
   lrc:   { label:"LRC",       ext:["lrc"],                       hubs:["cues","plain","bytes"] },
   ttml:  { label:"TTML",      ext:["ttml","dfxp"],               hubs:["cues","plain","bytes"] },
 
-  audio: { label:"Audio",     ext:["mp3","m4a","aac","ogg","oga","opus","flac","wav","wave","weba",
-                                   "aif","aiff","aifc","au","snd","caf","mka",
-                                   "mp4","m4v","mov","webm","mkv","avi"], hubs:["audio","bytes"] },
+  audio: { label:"Audio",     ext:["mp3","m4a","m4b","aac","ogg","oga","opus","flac","wav","wave","weba",
+                                   "aif","aiff","aifc","au","snd","caf","mka"], hubs:["audio","bytes"], moduleHubs:["av"] },
+  audiox:{ label:"Audio",     ext:["wma","amr","ac3","eac3","ape","mp2","ra","dts","tta","wv","spx","gsm","voc","mpc","aax","8svx","w64"],
+                                                                 hubs:["bytes"], moduleHubs:["av"] },
+  video: { label:"Video",     ext:["mp4","m4v","mov","qt","webm","mkv","avi","wmv","asf","flv","f4v","3gp","3g2","mpg","mpeg","mpe",
+                                   "m2v","m1v","ts","mts","m2ts","vob","ogv","ogm","rm","rmvb","divx","mxf","dv","wtv","swf"],
+                                                                 hubs:["audio","bytes"], moduleHubs:["av"] },
   pdf:   { label:"PDF",       ext:["pdf"],                       hubs:["bytes"], module:"pdfjs", moduleHubs:["pdf"] },
   bin:   { label:"Binary",    ext:[],                            hubs:["bytes"] }
 };
@@ -105,7 +144,11 @@ export const TARGETS = {
   png:   { label:"PNG",       ext:"png",   via:["raster","mesh","pdf"],    group:"Image" },
   jpeg:  { label:"JPEG",      ext:"jpg",   via:["raster","mesh","pdf"],    group:"Image" },
   webp:  { label:"WebP",      ext:"webp",  via:["raster","mesh","pdf"],    group:"Image" },
-  frames:{ label:"Frames",    ext:"png",   via:["anim"],                   group:"Image", multi:true },
+  avif:  { label:"AVIF",      ext:"avif",  via:["raster"],                 group:"Image" },
+  jxl:   { label:"JPEG XL",   ext:"jxl",   via:["raster"],                 group:"Image" },
+  apng:  { label:"Animated PNG", ext:"png", via:["anim","raster"],         group:"Image" },
+  icns:  { label:"ICNS",      ext:"icns",  via:["raster"],                 group:"Image" },
+  frames:{ label:"Frames",    ext:"png",   via:["anim","av"],              group:"Image", multi:true },
   bmp:   { label:"BMP",       ext:"bmp",   via:["raster"],                 group:"Image" },
   ico:   { label:"ICO",       ext:"ico",   via:["raster"],                 group:"Image" },
   tiff:  { label:"TIFF",      ext:"tif",   via:["raster"],                 group:"Image" },
@@ -119,7 +162,19 @@ export const TARGETS = {
   ppm:   { label:"PPM",       ext:"ppm",   via:["raster"],                 group:"Image" },
   pgm:   { label:"PGM",       ext:"pgm",   via:["raster"],                 group:"Image" },
   qoi:   { label:"QOI",       ext:"qoi",   via:["raster"],                 group:"Image" },
-  gif:   { label:"GIF",       ext:"gif",   via:["anim","raster"],          group:"Image" },
+  gif:   { label:"GIF",       ext:"gif",   via:["anim","raster","av"],     group:"Image" },
+  ply:   { label:"PLY",       ext:"ply",   via:["mesh"],                   group:"Mesh" },
+  glb:   { label:"glTF binary", ext:"glb", via:["mesh"],                   group:"Mesh" },
+
+  mp4:   { label:"MP4",       ext:"mp4",   via:["av"],                     group:"Video" },
+  webm:  { label:"WebM",      ext:"webm",  via:["av"],                     group:"Video" },
+  mov:   { label:"MOV",       ext:"mov",   via:["av"],                     group:"Video" },
+  mkv:   { label:"MKV",       ext:"mkv",   via:["av"],                     group:"Video" },
+  avi:   { label:"AVI",       ext:"avi",   via:["av"],                     group:"Video" },
+  wmv:   { label:"WMV",       ext:"wmv",   via:["av"],                     group:"Video" },
+  flv:   { label:"FLV",       ext:"flv",   via:["av"],                     group:"Video" },
+  ogv:   { label:"OGV",       ext:"ogv",   via:["av"],                     group:"Video" },
+  mpg:   { label:"MPEG",      ext:"mpg",   via:["av"],                     group:"Video" },
 
   csv:   { label:"CSV",       ext:"csv",   via:["table","cues"],           group:"Data" },
   tsv:   { label:"TSV",       ext:"tsv",   via:["table","cues"],           group:"Data" },
@@ -138,6 +193,8 @@ export const TARGETS = {
   kml:   { label:"KML",       ext:"kml",   via:["table"],                  group:"Geo" },
   ics:   { label:"ICS",       ext:"ics",   via:["table"],                  group:"Data" },
   vcf:   { label:"vCard",     ext:"vcf",   via:["table"],                  group:"Data" },
+  bib:   { label:"BibTeX",    ext:"bib",   via:["table"],                  group:"Data" },
+  ris:   { label:"RIS",       ext:"ris",   via:["table"],                  group:"Data" },
 
   md:    { label:"Markdown",  ext:"md",    via:["rich","table","pdf","cues"],     group:"Document" },
   html:  { label:"HTML",      ext:"html",  via:["rich","table","pdf","cues"],     group:"Document" },
@@ -145,7 +202,8 @@ export const TARGETS = {
   rtf:   { label:"RTF",       ext:"rtf",   via:["rich","pdf","cues"],             group:"Document" },
   docx:  { label:"DOCX",      ext:"docx",  via:["rich","pdf","cues"],             group:"Document" },
   doc:   { label:"DOC",       ext:"doc",   via:["rich","pdf","cues"],             group:"Document" },
-  pdf:   { label:"PDF",       ext:"pdf",   via:["raster","rich","mesh","cues"],   group:"Document" },
+  pdf:   { label:"PDF",       ext:"pdf",   via:["raster","rich","mesh","cues","archive"], group:"Document" },
+  pptx:  { label:"PPTX",      ext:"pptx",  via:["rich","raster","pdf"],           group:"Document" },
   odt:   { label:"ODT",       ext:"odt",   via:["rich","pdf","cues"],             group:"Document" },
   epub:  { label:"EPUB",      ext:"epub",  via:["rich","pdf","cues"],             group:"Document" },
   latex: { label:"LaTeX",     ext:"tex",   via:["rich","pdf","cues"],      group:"Document" },
@@ -162,16 +220,31 @@ export const TARGETS = {
   lrc:   { label:"LRC",       ext:"lrc",   via:["cues"],                   group:"Subtitles" },
   ttml:  { label:"TTML",      ext:"ttml",  via:["cues"],                   group:"Subtitles" },
 
-  wav:   { label:"WAV",       ext:"wav",   via:["audio"],                  group:"Audio" },
-  aiff:  { label:"AIFF",      ext:"aiff",  via:["audio"],                  group:"Audio" },
+  mp3:   { label:"MP3",       ext:"mp3",   via:["av"],                     group:"Audio" },
+  wav:   { label:"WAV",       ext:"wav",   via:["audio","av"],             group:"Audio" },
+  flac:  { label:"FLAC",      ext:"flac",  via:["av"],                     group:"Audio" },
+  m4a:   { label:"M4A",       ext:"m4a",   via:["av"],                     group:"Audio" },
+  ogg:   { label:"OGG",       ext:"ogg",   via:["av"],                     group:"Audio" },
+  opus:  { label:"Opus",      ext:"opus",  via:["audio","av"],             group:"Audio" },
+  aac:   { label:"AAC",       ext:"aac",   via:["audio","av"],             group:"Audio" },
+  aiff:  { label:"AIFF",      ext:"aiff",  via:["audio","av"],             group:"Audio" },
+  wma:   { label:"WMA",       ext:"wma",   via:["av"],                     group:"Audio" },
+  ac3:   { label:"AC3",       ext:"ac3",   via:["av"],                     group:"Audio" },
   pcm:   { label:"Raw PCM",   ext:"pcm",   via:["audio"],                  group:"Audio" },
-  opus:  { label:"Opus",      ext:"opus",  via:["audio"],                  group:"Audio" },
-  aac:   { label:"AAC",       ext:"aac",   via:["audio"],                  group:"Audio" },
+
+  sfnt:  { label:"TTF / OTF", ext:"ttf",   via:["font"],                   group:"Font" },
+  woff:  { label:"WOFF",      ext:"woff",  via:["font"],                   group:"Font" },
+  woff2: { label:"WOFF2",     ext:"woff2", via:["font"],                   group:"Font" },
 
   zip:   { label:"ZIP",       ext:"zip",   via:["archive","bytes"],        group:"Archive" },
   tar:   { label:"TAR",       ext:"tar",   via:["archive","bytes"],        group:"Archive" },
   tgz:   { label:"TGZ",       ext:"tgz",   via:["archive","bytes"],        group:"Archive" },
+  sevenz:{ label:"7z",        ext:"7z",    via:["archive","bytes"],        group:"Archive" },
+  txz:   { label:"TAR.XZ",    ext:"tar.xz", via:["archive","bytes"],       group:"Archive" },
+  tbz2:  { label:"TAR.BZ2",   ext:"tar.bz2", via:["archive","bytes"],      group:"Archive" },
   gz:    { label:"Gzip",      ext:"gz",    via:["bytes"],                  group:"Archive" },
+  xz:    { label:"XZ",        ext:"xz",    via:["bytes"],                  group:"Archive" },
+  bz2:   { label:"Bzip2",     ext:"bz2",   via:["bytes"],                  group:"Archive" },
   files: { label:"Extract",   ext:"",      via:["archive","icons","anim","pdf"], group:"Archive", multi:true },
 
   base64:{ label:"Base64",    ext:"b64.txt",     via:["bytes"],            group:"Encoding" },
@@ -182,7 +255,7 @@ export const TARGETS = {
   datauri:{ label:"Data URI", ext:"datauri.txt", via:["bytes"],            group:"Encoding" }
 };
 
-export const GROUP_ORDER = ["Image","Document","Data","Geo","Mesh","Subtitles","Audio","Archive","Encoding"];
+export const GROUP_ORDER = ["Image","Video","Audio","Document","Data","Geo","Mesh","Subtitles","Font","Archive","Encoding"];
 
 export const EXT2KIND = (() => {
   const m = new Map();
@@ -213,7 +286,16 @@ export const MIME = {
   toml:"application/toml", ini:"text/plain", sql:"application/sql",
   msgpack:"application/msgpack", cbor:"application/cbor",
   geojson:"application/geo+json", gpx:"application/gpx+xml",
-  kml:"application/vnd.google-earth.kml+xml", ics:"text/calendar", vcf:"text/vcard"
+  kml:"application/vnd.google-earth.kml+xml", ics:"text/calendar", vcf:"text/vcard",
+  avif:"image/avif", jxl:"image/jxl", apng:"image/apng", icns:"image/icns",
+  mp4:"video/mp4", webm:"video/webm", mov:"video/quicktime", mkv:"video/x-matroska", avi:"video/x-msvideo",
+  wmv:"video/x-ms-wmv", flv:"video/x-flv", ogv:"video/ogg", mpg:"video/mpeg",
+  mp3:"audio/mpeg", flac:"audio/flac", m4a:"audio/mp4", ogg:"audio/ogg", wma:"audio/x-ms-wma", ac3:"audio/ac3",
+  pptx:"application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  bib:"application/x-bibtex", ris:"application/x-research-info-systems",
+  ply:"model/ply", glb:"model/gltf-binary",
+  sfnt:"font/ttf", woff:"font/woff", woff2:"font/woff2",
+  sevenz:"application/x-7z-compressed", txz:"application/x-xz", tbz2:"application/x-bzip2", xz:"application/x-xz", bz2:"application/x-bzip2"
 };
 
 export function hubsOf(kind){
@@ -231,12 +313,13 @@ export function routeFor(kind, target){
 
 export const COMBINE = {
   pdf:  ["raster","rich"],
+  pptx: ["raster","rich"],
   gif:  ["anim","raster"],
   xlsx: ["table"], ods: ["table"], csv: ["table"], tsv: ["table"],
   json: ["table"], sql: ["table"],
   epub: ["rich"], docx: ["rich"], doc: ["rich"], rtf: ["rich"], odt: ["rich"], md: ["rich"], html: ["rich"], txt: ["rich"],
   latex: ["rich"], adoc: ["rich"], rst: ["rich"], bbcode: ["rich"],
-  zip:  ["bytes"], tar: ["bytes"], tgz: ["bytes"]
+  zip:  ["bytes"], tar: ["bytes"], tgz: ["bytes"], sevenz: ["bytes"], txz: ["bytes"], tbz2: ["bytes"]
 };
 
 export function canCombine(items, target){
