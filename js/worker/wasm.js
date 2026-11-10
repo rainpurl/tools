@@ -43,9 +43,17 @@ function collect(FS, dir){
 
 async function runFfmpeg(p){
   if (!ff){
-    const mod = await import(FFMPEG);
-    const wasmURL = FFMPEG.replace(/\.js$/, ".wasm");
-    ff = await mod.default({ mainScriptUrlOrBlob: `${FFMPEG}#${btoa(JSON.stringify({ wasmURL, workerURL: "" }))}` });
+    // the same package from a second host, in case the first will not serve a file this large
+    let last;
+    for (const url of [FFMPEG, FFMPEG.replace(CDN, "https://unpkg.com/")]){
+      try {
+        const mod = await import(url);
+        const wasmURL = url.replace(/\.js$/, ".wasm");
+        ff = await mod.default({ mainScriptUrlOrBlob: `${url}#${btoa(JSON.stringify({ wasmURL, workerURL: "" }))}` });
+        break;
+      } catch (e){ last = e; }
+    }
+    if (!ff) throw new Error("ffmpeg could not be fetched, check the connection" + (last && last.message ? " (" + String(last.message).slice(0, 120) + ")" : ""));
   }
   const FS = ff.FS;
   const tail = [];
