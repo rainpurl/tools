@@ -69,12 +69,13 @@ import {
 } from "./mesh.js";
 import { MODULES, MODULE_HUBS } from "./modules.js";
 import { htmlToOdt, odfOpen, odpToHtml, odsToSheets, odtToHtml, sheetsToOds } from "./odf.js";
-import { docxToHtml, htmlToDocx, pptxToHtml, sheetsToXlsx, xlsxToSheets } from "./office.js";
+import { htmlToDocx, htmlToRtf } from "./docwrite.js";
+import { docxToHtml, pptxToHtml, sheetsToXlsx, xlsxToSheets } from "./office.js";
 import { loadPdfDoc, pdfToCanvases, pdfToHtml } from "./pdfread.js";
 import { htmlToPdf, imagesToPdf } from "./pdfwrite.js";
 import { canvasToBytes, epsToPdf, loadRaster } from "./raster.js";
 import { KINDS, MIME, TARGETS, VECTOR_KINDS, canCombine, routeFor } from "./registry.js";
-import { htmlDoc, htmlToMd, htmlToRtf, htmlToText, mdToHtml } from "./rich.js";
+import { htmlDoc, htmlToMd, htmlToText, mdToHtml } from "./rich.js";
 import { rtfToHtml } from "./rtf.js";
 import {
   jsonToTable,
@@ -282,8 +283,8 @@ export async function emitRich(html, target, opts, one){
   if (target === "html") return one(enc.encode(html));
   if (target === "md")   return one(enc.encode(htmlToMd(html) + "\n"));
   if (target === "txt")  return one(enc.encode(htmlToText(html, opts.textWrap || 0)));
-  if (target === "rtf")  return one(enc.encode(htmlToRtf(html)));
-  if (target === "docx") return one(await htmlToDocx(html, ""));
+  if (target === "rtf" || target === "doc") return one(enc.encode(htmlToRtf(html)));
+  if (target === "docx") return one(await htmlToDocx(html));
   if (target === "odt")  return one(await htmlToOdt(html, opts.docTitle || ""));
   if (target === "epub") return one(await htmlToEpub(html, opts.docTitle || ""));
   if (target === "latex")  return one(enc.encode(htmlToLatex(html, opts.docTitle || "")));
@@ -333,8 +334,9 @@ export async function convertItem(item, target, opts){
     return out;
   }
 
-  if (hub === "pdf" && ["md","txt","html","docx","rtf","odt","epub","latex","adoc","rst","bbcode"].includes(target)){
-    const html = await pdfToHtml(val);
+  if (hub === "pdf" && TARGETS[target].via.includes("rich")){
+    // colours and pictures cost a render of every page, so only read them where they can be kept
+    const html = await pdfToHtml(val, { ...opts, styled: ["docx", "doc", "rtf", "html"].includes(target), pageBreaks: opts.pdfPageBreaks !== false });
     const out = await emitRich(html, target, opts, one);
     if (out) return out;
   }
@@ -449,7 +451,7 @@ export async function convertItem(item, target, opts){
       if (target === "sbv")  return one(enc.encode(cuesToSbv(val)));
       if (target === "lrc")  return one(enc.encode(cuesToLrc(val)));
       if (target === "ttml") return one(enc.encode(cuesToTtml(val, opts.docTitle)));
-      if (["md","html","docx","odt","pdf","epub","rtf","latex","adoc","rst","bbcode"].includes(target)){
+      if (TARGETS[target].via.includes("rich")){
         const out = await emitRich(cuesToRich(val, opts.docTitle), target, opts, one);
         if (out) return out;
       }

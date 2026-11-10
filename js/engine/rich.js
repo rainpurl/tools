@@ -328,31 +328,3 @@ export function rtfToText(text){
   return s.replace(/\r\n?/g, "\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
 }
 
-export function htmlToRtf(html){
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  doc.querySelectorAll("script,style,head").forEach(n => n.remove());
-  const esc = s => s.replace(/[\\{}]/g, c => "\\" + c)
-    .replace(/[\u0080-\uffff]/g, c => "\\u" + c.charCodeAt(0) + "?");
-  const walk = (n, st) => {
-    if (n.nodeType === 3) return esc(n.nodeValue.replace(/\s+/g, " "));
-    if (n.nodeType !== 1) return "";
-    const t = n.tagName.toUpperCase();
-    const kids = () => Array.from(n.childNodes).map(c => walk(c, st)).join("");
-    if (t in H_LEVEL){ const sz = 34 - H_LEVEL[t] * 3; return `\\pard\\sa180\\b\\fs${sz} ${kids()}\\b0\\fs22\\par\n`; }
-    switch (t){
-      case "BR": return "\\line ";
-      case "HR": return "\\pard\\brdrb\\brdrs\\brdrw10\\par\n";
-      case "B": case "STRONG": return "{\\b " + kids() + "}";
-      case "I": case "EM": return "{\\i " + kids() + "}";
-      case "U": return "{\\ul " + kids() + "}";
-      case "CODE": case "PRE": return "{\\f1 " + kids() + "}" + (t === "PRE" ? "\\par\n" : "");
-      case "LI": return "\\pard\\fi-360\\li720\\sa60 \\bullet\\tab " + kids() + "\\par\n";
-      case "P": case "DIV": case "BLOCKQUOTE": return "\\pard\\sa180 " + kids() + "\\par\n";
-      case "TR": return kids() + "\\par\n";
-      case "TD": case "TH": return kids() + "\\tab ";
-      default: return kids();
-    }
-  };
-  const body = walk(doc.body || doc.documentElement, {});
-  return "{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Helvetica;}{\\f1 Courier New;}}\\fs22\n" + body + "}";
-}

@@ -144,6 +144,7 @@ export const TARGETS = {
   txt:   { label:"Text",      ext:"txt",   via:["rich","table","cues","tree","pdf","plain"], group:"Document" },
   rtf:   { label:"RTF",       ext:"rtf",   via:["rich","pdf","cues"],             group:"Document" },
   docx:  { label:"DOCX",      ext:"docx",  via:["rich","pdf","cues"],             group:"Document" },
+  doc:   { label:"DOC",       ext:"doc",   via:["rich","pdf","cues"],             group:"Document" },
   pdf:   { label:"PDF",       ext:"pdf",   via:["raster","rich","mesh","cues"],   group:"Document" },
   odt:   { label:"ODT",       ext:"odt",   via:["rich","pdf","cues"],             group:"Document" },
   epub:  { label:"EPUB",      ext:"epub",  via:["rich","pdf","cues"],             group:"Document" },
@@ -197,7 +198,7 @@ export const MIME = {
   qoi:"image/qoi", gif:"image/gif", frames:"image/png",
   csv:"text/csv", tsv:"text/tab-separated-values", json:"application/json", jsonl:"application/x-ndjson",
   yaml:"text/yaml", xml:"application/xml", md:"text/markdown", html:"text/html", txt:"text/plain",
-  rtf:"application/rtf", docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  rtf:"application/rtf", doc:"application/msword", docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   xlsx:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", pdf:"application/pdf",
   odt:"application/vnd.oasis.opendocument.text", ods:"application/vnd.oasis.opendocument.spreadsheet",
   epub:"application/epub+zip",
@@ -233,7 +234,7 @@ export const COMBINE = {
   gif:  ["anim","raster"],
   xlsx: ["table"], ods: ["table"], csv: ["table"], tsv: ["table"],
   json: ["table"], sql: ["table"],
-  epub: ["rich"], docx: ["rich"], odt: ["rich"], md: ["rich"], html: ["rich"], txt: ["rich"],
+  epub: ["rich"], docx: ["rich"], doc: ["rich"], rtf: ["rich"], odt: ["rich"], md: ["rich"], html: ["rich"], txt: ["rich"],
   latex: ["rich"], adoc: ["rich"], rst: ["rich"], bbcode: ["rich"],
   zip:  ["bytes"], tar: ["bytes"], tgz: ["bytes"]
 };

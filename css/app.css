@@ -22,7 +22,11 @@ h1{font-size:26px;margin:0 0 28px;letter-spacing:-.022em;font-weight:600}
 .sub{color:var(--muted);margin:0 0 28px;font-size:14px;letter-spacing:-.005em}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:16px}
 .panel h2{font-size:13px;margin:0 0 14px;color:var(--muted);font-weight:500;letter-spacing:-.005em}
-.panel.off{opacity:.5;pointer-events:none}
+.panel.off{display:none}
+.panel.busy{opacity:.6;pointer-events:none}
+.panel{animation:rise .18s ease-out}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.panel.idle .stats,.panel.idle .bar,.panel.idle [role=log],.panel.idle .eta{display:none}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 button{
   font:inherit;font-weight:450;padding:9px 16px;border-radius:7px;border:1px solid var(--line2);
@@ -198,7 +202,7 @@ a.dl:hover{border-color:var(--ink)}
 
 .note{font-size:13px;color:var(--muted);border-left:1px solid var(--line2);padding-left:12px;margin:14px 0 0}
 .warn{background:var(--fill);border:1px solid var(--line2);padding:11px 13px;border-radius:8px;font-size:13px;margin-bottom:14px}
-.hide{display:none}
+.hide{display:none!important}
 code{font-family:var(--mono);font-size:12.5px;background:var(--fill);padding:1px 5px;border-radius:4px}
 
 /* Image editor. The checkerboard makes removed areas visible as removed. */
@@ -254,7 +258,8 @@ body.dragging .app-panel:not(.hide) .drop{border-color:var(--ink);color:var(--in
 
 .f .gain{font-size:11px;font-family:var(--mono);color:var(--muted);white-space:nowrap}
 
-.foot{margin:26px 0 0;font-size:12.5px;color:var(--faint);display:flex;gap:14px;flex-wrap:wrap}
+.foot{margin:26px 0 0;font-size:12.5px;color:var(--faint);display:flex;gap:6px 14px;flex-wrap:wrap}
+.foot .made{margin-left:auto;letter-spacing:.02em}
 .foot a{color:var(--muted);text-decoration:none;border-bottom:1px solid var(--line2)}
 .foot a:hover{color:var(--ink);border-color:var(--ink)}
 
@@ -265,4 +270,18 @@ body.dragging .app-panel:not(.hide) .drop{border-color:var(--ink);color:var(--in
   .app{padding:9px 12px;white-space:nowrap}
   .stats{grid-template-columns:repeat(auto-fit,minmax(86px,1fr))}
 }
-@media (prefers-reduced-motion:reduce){ .bar i{transition:none} }
+@media (prefers-reduced-motion:reduce){ .bar i{transition:none} .panel{animation:none} }
+
+/* ---- animation frames ---- */
+.anim{margin:12px 0 4px;display:flex;flex-direction:column;gap:8px}
+.strip{display:flex;gap:6px;overflow-x:auto;padding:4px 2px 8px;scrollbar-width:thin}
+.fr{flex:0 0 auto;border:1px solid var(--line);border-radius:6px;padding:4px;background:var(--panel);cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:3px;font:inherit;color:inherit}
+.fr canvas{height:54px;width:auto;max-width:110px;display:block;border-radius:3px;
+  background:repeating-conic-gradient(#e9e9e9 0 25%,#fff 0 50%) 0 0/10px 10px}
+.fr small{font-size:10px;font-family:var(--mono);color:var(--muted);line-height:1}
+.fr:hover{border-color:var(--ink)}
+.fr.sel{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.fr.cur small{color:var(--ink);font-weight:600}
+.cropnums.two{grid-template-columns:repeat(2,1fr)}
+.tool[id=iToolFrames]{grid-column:1/-1}

@@ -1,7 +1,7 @@
 // Animation frames and the GIF writer.
 
 import { canvasRGBA, resizeCanvas } from "./canvas.js";
-import { concatBytes, enc } from "./util.js";
+import { concatBytes, crc32, deflateZlib, enc } from "./util.js";
 
 export const ANIM_MIME = { gif:"image/gif", webp:"image/webp", avif:"image/avif", png:"image/png" };
 
@@ -246,4 +246,98 @@ export async function framesToGif(frames, opts){
 
   parts.push(Uint8Array.from([0x3b]));
   return concatBytes(parts);
+}
+
+/* --------------------------------------------------------------------------
+   Animated PNG. Each frame is a whole PNG image; the animation is the first
+   frame's file with control chunks added and the later frames' pixel data
+   renamed from IDAT to fdAT.
+   -------------------------------------------------------------------------- */
+
+function pngChunks(u8){
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  const out = [];
+  let p = 8;
+  while (p + 12 <= u8.length){
+    const len = dv.getUint32(p);
+    const type = String.fromCharCode(u8[p + 4], u8[p + 5], u8[p + 6], u8[p + 7]);
+    out.push({ type, data: u8.subarray(p + 8, p + 8 + len) });
+    p += 12 + len;
+  }
+  return out;
+}
+
+function pngChunk(type, data){
+  const out = new Uint8Array(12 + data.length);
+  const dv = new DataView(out.buffer);
+  dv.setUint32(0, data.length);
+  for (let i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
+  out.set(data, 8);
+  dv.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
+  return out;
+}
+
+// Plain 8 bit RGBA PNG pixel data, written here so every frame has the same layout.
+async function pngIdat(canvas){
+  const w = canvas.width, h = canvas.height, px = canvasRGBA(canvas);
+  const stride = w * 4;
+  const raw = new Uint8Array((stride + 1) * h);
+  for (let y = 0; y < h; y++){
+    const o = y * (stride + 1), r = y * stride;
+    if (y === 0){
+      raw[o] = 1;                                   // Sub
+      for (let x = 0; x < stride; x++) raw[o + 1 + x] = (px[r + x] - (x >= 4 ? px[r + x - 4] : 0)) & 255;
+    } else {
+      raw[o] = 2;                                   // Up
+      for (let x = 0; x < stride; x++) raw[o + 1 + x] = (px[r + x] - px[r + x - stride]) & 255;
+    }
+  }
+  return deflateZlib(raw);
+}
+
+export async function framesToApng(frames, opts){
+  if (!frames.length) throw new Error("no frames to encode");
+  const w = frames[0].canvas.width, h = frames[0].canvas.height;
+  const parts = [new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])];
+  const ihdr = new Uint8Array(13);
+  const idv = new DataView(ihdr.buffer);
+  idv.setUint32(0, w); idv.setUint32(4, h);
+  ihdr[8] = 8; ihdr[9] = 6;
+  parts.push(pngChunk("IHDR", ihdr));
+  const actl = new Uint8Array(8);
+  new DataView(actl.buffer).setUint32(0, frames.length);
+  new DataView(actl.buffer).setUint32(4, +((opts && opts.gifLoop) ?? 0));
+  parts.push(pngChunk("acTL", actl));
+
+  let seq = 0;
+  for (const [i, f] of frames.entries()){
+    const src = f.canvas.width === w && f.canvas.height === h ? f.canvas : resizeCanvas(f.canvas, Math.max(w, h), null);
+    const fctl = new Uint8Array(26);
+    const dv = new DataView(fctl.buffer);
+    dv.setUint32(0, seq++);
+    dv.setUint32(4, w); dv.setUint32(8, h);
+    dv.setUint16(20, Math.max(1, Math.min(65535, Math.round(f.delay ?? 100))));
+    dv.setUint16(22, 1000);
+    fctl[24] = 0; fctl[25] = 0;                     // keep the canvas, replace the pixels
+    parts.push(pngChunk("fcTL", fctl));
+    const data = await pngIdat(src);
+    if (i === 0) parts.push(pngChunk("IDAT", data));
+    else {
+      const fd = new Uint8Array(4 + data.length);
+      new DataView(fd.buffer).setUint32(0, seq++);
+      fd.set(data, 4);
+      parts.push(pngChunk("fdAT", fd));
+    }
+  }
+  parts.push(pngChunk("IEND", new Uint8Array(0)));
+  return concatBytes(parts);
+}
+
+// True when a PNG file carries more than one frame.
+export function isApng(head){
+  for (const c of pngChunks(head)){
+    if (c.type === "acTL") return true;
+    if (c.type === "IDAT") return false;
+  }
+  return false;
 }

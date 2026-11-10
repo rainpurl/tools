@@ -42,7 +42,7 @@ export function opt(id, dflt){ return OPTS[id] === undefined ? dflt : OPTS[id]; 
 export function makeLog(el, max = 600){
   let fresh = true;
   const log = (msg, cls) => {
-    if (fresh){ el.textContent = ""; fresh = false; }
+    if (fresh){ el.textContent = ""; fresh = false; el.classList.remove("hide"); }
     const line = document.createElement("div");
     if (cls) line.className = cls;
     line.textContent = msg;
@@ -66,7 +66,7 @@ export async function identify(files){
   }));
 }
 
-const THUMB = /^image\/(png|jpeg|webp|gif|bmp|avif)$/;
+const THUMB = /^image\/(png|apng|jpeg|webp|gif|bmp|avif)$/;
 
 export function showResult(box, name, bytes, mime){
   const url = URL.createObjectURL(new Blob([bytes], { type: mime || "application/octet-stream" }));

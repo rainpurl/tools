@@ -257,7 +257,11 @@ export async function htmlToOdt(html, title){
       if (c.nodeType !== 1) continue;
       const t = c.tagName.toUpperCase();
       if (t === "BR"){ out += "<text:line-break/>"; continue; }
-      if (t === "IMG"){ out += T("[image: " + (c.getAttribute("alt") || c.getAttribute("src") || "") + "]"); continue; }
+      if (t === "IMG"){
+        const src = c.getAttribute("src") || "";
+        out += T("[image" + ((c.getAttribute("alt") || (src.startsWith("data:") ? "" : src)) ? ": " + (c.getAttribute("alt") || src) : "") + "]");
+        continue;
+      }
       if (t === "A"){
         const href = c.getAttribute("href") || "";
         const inner = inline(c, fmt);

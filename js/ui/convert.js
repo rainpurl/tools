@@ -352,6 +352,11 @@ function renderOpts(){
       `<input type="number" id="textWrap" min="0" max="200" step="5" value="${opt("textWrap", 0)}">`);
   }
 
+  if (kinds.has("pdf") && ["docx", "doc", "rtf", "html"].includes(t)){
+    check("pdfPageBreaks", "Start each PDF page on a new page", true);
+    note("Fonts, sizes, colours, alignment, lists, tables, pictures and columns are rebuilt as editable text. A scanned PDF has no text to rebuild, so its pages come through as pictures.");
+  }
+
   head("Captions");
   if (t === "ass"){
     field("assFont", "Font name", `<input type="text" id="assFont" value="${escHtml(opt("assFont", "Arial"))}">`);
@@ -443,6 +448,7 @@ async function run(){
   bump();
   $("bar").style.width = "0%";
   $("eta").textContent = "";
+  $("panelRun").classList.remove("idle");
 
   const t = state.target;
   const plain = runOpts();                              // safe to send to a worker

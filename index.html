@@ -61,7 +61,7 @@
     <div id="opts" class="opts"></div>
   </div>
 
-  <div class="panel off" id="panelRun">
+  <div class="panel off idle" id="panelRun">
     <h2>4. Run</h2>
     <div class="row" style="margin-bottom:16px">
       <button id="go" class="primary" disabled title="Ctrl or Cmd with Enter">Convert</button>
@@ -88,9 +88,9 @@
     <h2>Images</h2>
     <div id="iDrop" class="drop" data-app="images" data-input="iInput"><b>Choose images</b> or drop them here</div>
     <input id="iInput" type="file" multiple class="hide">
-    <p class="note">Anything the Convert tab reads as an image works here, including SVG, EPS, PSD, TIFF, HEIC and the first page of a PDF.</p>
-    <div class="opts" style="margin-top:14px">
-      <div class="o"><label for="iVecSize">Render SVG, EPS and PDF at, longest side in px</label>
+    <p class="note" id="iIntro">Photos, GIFs, SVG, EPS, PSD, TIFF, HEIC and the first page of a PDF all open here.</p>
+    <div class="opts hide" id="iVecRow" style="margin-top:14px">
+      <div class="o"><label for="iVecSize">Draw this file at, longest side in px</label>
         <input type="number" id="iVecSize" min="256" max="16384" step="256" value="4096"></div>
     </div>
     <div id="iList" class="files"></div>
@@ -109,7 +109,43 @@
         <div id="iCrop" class="cropbox hide"><i data-c="nw"></i><i data-c="ne"></i><i data-c="sw"></i><i data-c="se"></i></div>
       </div>
     </div>
+
+    <div id="iAnim" class="anim hide">
+      <div class="row">
+        <button class="sm" id="iPlay">Play</button>
+        <button class="sm" id="iFrSelAll">Select all frames</button>
+        <span class="tcount" id="iFrameInfo"></span>
+      </div>
+      <div id="iStrip" class="strip" aria-label="Frames"></div>
+      <p class="onote">Click a frame to show it. Shift click selects a run, Ctrl or Cmd click adds one. Every edit below applies to all frames.</p>
+    </div>
+
     <div class="tools">
+      <div class="tool hide" id="iToolFrames">
+        <h3>Frames</h3>
+        <div class="row">
+          <button class="sm" id="iFrDelete">Delete selected</button>
+          <button class="sm" id="iFrKeep">Keep only selected</button>
+          <button class="sm" id="iFrDup">Duplicate</button>
+        </div>
+        <div class="row">
+          <button class="sm" id="iFrEarlier">Move earlier</button>
+          <button class="sm" id="iFrLater">Move later</button>
+          <button class="sm" id="iFrReverse">Reverse order</button>
+        </div>
+        <div class="row">
+          <button class="sm" id="iFrHalf">Drop every other frame</button>
+          <button class="sm" id="iFrExtract">Save selected as PNG</button>
+        </div>
+        <div class="o"><label for="iFrDelay">Time on screen for the selected frames, in ms</label>
+          <input type="number" id="iFrDelay" min="20" max="60000" step="10" value="100"></div>
+        <div class="row">
+          <button class="sm" id="iFrDelaySet">Set time</button>
+          <button class="sm" id="iFrSlower">Slower</button>
+          <button class="sm" id="iFrFaster">Faster</button>
+        </div>
+      </div>
+
       <div class="tool">
         <h3>Crop</h3>
         <div class="o"><label for="iAspect">Aspect ratio</label>
@@ -130,6 +166,19 @@
           <button class="sm" id="iCropCancel">Cancel</button>
         </div>
         <div class="row"><button class="sm" id="iTrim">Trim transparent edges</button></div>
+      </div>
+
+      <div class="tool">
+        <h3>Resize</h3>
+        <div class="cropnums two">
+          <label>width<input type="number" id="iRw" min="1" max="16384" step="1"></label>
+          <label>height<input type="number" id="iRh" min="1" max="16384" step="1"></label>
+        </div>
+        <div class="o check"><input type="checkbox" id="iRLock" checked><label for="iRLock">Keep the proportions</label></div>
+        <div class="row">
+          <button class="sm" id="iResize">Resize</button>
+          <button class="sm" id="iRHalf">Half size</button>
+        </div>
       </div>
 
       <div class="tool">
@@ -193,21 +242,30 @@
       <div class="o"><label for="iFmt">Format</label>
         <select id="iFmt">
           <option value="png">PNG</option><option value="webp">WebP</option><option value="jpeg">JPEG</option>
-          <option value="tiff">TIFF</option><option value="bmp">BMP</option><option value="gif">GIF</option>
+          <option value="gif">GIF</option><option value="apng">Animated PNG</option>
+          <option value="tiff">TIFF</option><option value="bmp">BMP</option>
           <option value="ico">ICO</option><option value="tga">TGA</option><option value="qoi">QOI</option>
           <option value="eps">EPS</option><option value="svg">SVG, image embedded</option>
         </select></div>
-      <div class="o"><label for="iQuality">Quality for JPEG and WebP</label>
+      <div class="o" id="iQualityRow"><label for="iQuality">Quality</label>
         <div class="range"><input type="range" id="iQuality" min="0.3" max="1" step="0.01" value="0.92"><output>92</output></div></div>
-      <div class="o"><label for="iBg">Background for formats without transparency</label>
+      <div class="o" id="iBgRow"><label for="iBg">Background where the image is transparent</label>
         <input type="text" id="iBg" value="#ffffff"></div>
+      <div class="o" id="iGifColorsRow"><label for="iGifColors">Colours in the GIF</label>
+        <select id="iGifColors">
+          <option value="256">256, best quality</option><option value="128">128</option>
+          <option value="64">64</option><option value="32">32</option><option value="16">16, smallest file</option>
+        </select></div>
+      <div class="o check" id="iLoopRow"><input type="checkbox" id="iLoop" checked><label for="iLoop">Loop forever</label></div>
       <div class="o"><label for="iName">File name</label><input type="text" id="iName" value="image"></div>
     </div>
+    <p class="onote hide" id="iFmtNote"></p>
     <div class="row" style="margin:14px 0 12px">
       <button class="primary" id="iSave">Save image</button>
-      <button class="sm" id="iSaveAll">Save all as zip</button>
+      <button class="sm hide" id="iSaveFrames">Save every frame as PNG</button>
+      <button class="sm hide" id="iSaveAll">Save all as zip</button>
     </div>
-    <div id="iLog" role="log" aria-live="polite">Ready.</div>
+    <div id="iLog" role="log" aria-live="polite" class="hide">Ready.</div>
     <div id="iResults" class="out"></div>
   </div>
 </section>
@@ -271,7 +329,7 @@
     </div>
   </div>
 
-  <div class="panel off" id="bPanelRun">
+  <div class="panel off idle" id="bPanelRun">
     <h2>3. Run</h2>
     <div class="row" style="margin-bottom:16px">
       <button id="bGo" class="primary">Run</button>
@@ -362,10 +420,11 @@
   </div>
 </section>
 
-  <p class="foot">
+  <footer class="foot">
     <span>Files stay on this device. Nothing is uploaded.</span>
     <a href="https://github.com/rainpurl/tools" rel="noopener">Source</a>
-  </p>
+    <span class="made">built in austin | <a href="https://katr.es">STUDIO KATRESAI</a></span>
+  </footer>
 </main>
 </body>
 </html>

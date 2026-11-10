@@ -1,6 +1,7 @@
 // Worker side of the pool. One job at a time: convert a file, process a batch
 // image, or run a pixel operation on a bitmap.
 
+import { framesToApng, framesToGif } from "../engine/anim.js";
 import { convertItem } from "../engine/convert.js";
 import { PIXEL_OPS, processImage } from "../engine/imageops.js";
 
@@ -26,6 +27,17 @@ const OPS = {
     const r = await processImage(p.file, p.kind, p.settings, { allowModules: true, notify });
     r.bytes = own(r.bytes, new Set());
     return { result: r, transfer: [r.bytes.buffer] };
+  },
+
+  async animate(p){
+    const frames = p.frames.map(f => {
+      const c = new OffscreenCanvas(f.bitmap.width, f.bitmap.height);
+      c.getContext("2d").drawImage(f.bitmap, 0, 0);
+      f.bitmap.close();
+      return { canvas: c, delay: f.delay };
+    });
+    const bytes = own(await (p.format === "apng" ? framesToApng : framesToGif)(frames, p.opts || {}), new Set());
+    return { result: bytes, transfer: [bytes.buffer] };
   },
 
   async pixel(p, notify){

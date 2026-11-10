@@ -173,6 +173,7 @@ async function run(){
   clearResults($("bResults"));
   bLog.clear();
   $("bBar").style.width = "0%";
+  $("bPanelRun").classList.remove("idle");
 
   const s = settings();
   const items = bState.items.slice();
