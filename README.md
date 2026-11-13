@@ -2,9 +2,6 @@
 
 File tools that run in the browser. Live at [tools.katr.es](https://tools.katr.es).
 
-Files stay on the device. Nothing is uploaded. There is no server code and no build step.
-
-
 
 | Group | Reads | Writes |
 | --- | --- | --- |
