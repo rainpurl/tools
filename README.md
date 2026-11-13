@@ -24,6 +24,10 @@ Files stay on the device. Nothing is uploaded. There is no server code and no bu
 
 PDF to DOCX, DOC and RTF keeps the layout as real, editable Word content: fonts, sizes, colours, bold, italic, underline, alignment, indents, lists, tables with borders and shading, pictures, links, columns, and the running header and footer with a live page number. A PDF stores marks on a page, so paragraphs, tables and lists are worked out from positions. A scanned PDF holds only pictures of text, so its pages come through as pictures. The `.doc` output is rich text in a `.doc` file, which Word opens as a document.
 
+### PDF colour removal
+
+The PDF tab has a Colour option for cheaper printing. Greyscale keeps text and vectors as they are and drops all colour, by painting a grey layer over each page with the Color blend mode. If a printer ignores that, rasterise the pages and the pixels themselves turn grey. Black and white renders every page to an image and turns each pixel black or white around a cutoff you set.
+
 ### Optional downloads
 
 A few formats need a large library. Each is fetched from a CDN only when a file needs it:
