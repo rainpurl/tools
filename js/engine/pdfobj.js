@@ -301,6 +301,42 @@ export async function pdfBuild(plan, opts){
 
   const alloc = () => next++;
 
+  // Greyscale without touching the page content. The original content is wrapped
+  // in q / Q, then a grey rectangle is painted over the page with the Color blend
+  // mode. That mode keeps the brightness of what is underneath and drops all hue
+  // and saturation, so text and vectors stay sharp and selectable.
+  const own = v => {
+    if (v instanceof PdfRef){
+      const t = bodies.get(v.num);
+      return t instanceof Map ? t : null;
+    }
+    return v instanceof Map ? v : null;
+  };
+  const greyPage = (d, box) => {
+    const res = new Map(own(d.get("Resources")) || []);
+    const gsBase = own(res.get("ExtGState"));
+    const gs = new Map(gsBase || []);
+    gs.set("GSgreyfx", new Map([
+      ["Type", new PdfName("ExtGState")], ["BM", new PdfName("Color")],
+      ["ca", 1], ["CA", 1]
+    ]));
+    res.set("ExtGState", gs);
+    d.set("Resources", res);
+    const mk = text => {
+      const n = alloc();
+      bodies.set(n, new PdfStream(new Map(), enc.encode(text)));
+      return new PdfRef(n);
+    };
+    const x0 = Math.min(box[0], box[2]) - 1, y0 = Math.min(box[1], box[3]) - 1;
+    const w = Math.abs(box[2] - box[0]) + 2, h = Math.abs(box[3] - box[1]) + 2;
+    const orig = d.get("Contents");
+    const list = Array.isArray(orig) ? orig : orig ? [orig] : [];
+    d.set("Contents", [
+      mk("q\n"), ...list,
+      mk(`\nQ\nq /GSgreyfx gs 0 g ${x0} ${y0} ${w} ${h} re f Q\n`)
+    ]);
+  };
+
   const copy = (doc, val, depth) => {
     if (depth > 96) return null;
     if (val instanceof PdfRef){
@@ -335,7 +371,7 @@ export async function pdfBuild(plan, opts){
   const kids = [];
 
   for (const step of plan){
-    const { doc, page, rotate, crop } = step;
+    const { doc, page, rotate, crop, grey } = step;
     const num = alloc();
     const src = page.dict;
     const d = new Map();
@@ -363,6 +399,7 @@ export async function pdfBuild(plan, opts){
       const cur = doc.resolve(d.get("Rotate"));
       d.set("Rotate", (((typeof cur === "number" ? cur : 0) + rotate) % 360 + 360) % 360);
     }
+    if (grey) greyPage(d, box);
     bodies.set(num, d);
     kids.push(new PdfRef(num));
   }

@@ -201,12 +201,36 @@ function renderPdfOpts(){
 
   const out = $("pOutOpts");
   out.innerHTML = "";
-  add(out, "pdfMode", "How to save",
-    `<select id="pdfMode">
-       <option value="lossless"${opt("pdfMode","lossless")==="lossless"?" selected":""}>Keep text and vectors</option>
-       <option value="raster"${opt("pdfMode","lossless")==="raster"?" selected":""}>Rasterise every page</option>
+  const colour = opt("pdfColor", "keep");
+  const raster = opt("pdfMode", "lossless") === "raster" || colour === "bw";
+  add(out, "pdfColor", "Colour",
+    `<select id="pdfColor">
+       <option value="keep"${colour==="keep"?" selected":""}>Keep colour</option>
+       <option value="grey"${colour==="grey"?" selected":""}>Greyscale, for cheaper printing</option>
+       <option value="bw"${colour==="bw"?" selected":""}>Black and white only</option>
      </select>`);
-  if (opt("pdfMode", "lossless") === "lossless"){
+  if (colour === "grey" && !raster){
+    const n = document.createElement("p");
+    n.className = "onote";
+    n.textContent = "Greyscale keeps text selectable and sharp. If a printer still prints some colour, " +
+      "choose Rasterise every page below, which turns the pixels grey.";
+    out.appendChild(n);
+  }
+  if (colour === "bw"){
+    const n = document.createElement("p");
+    n.className = "onote";
+    n.textContent = "Black and white turns every page into an image, so text is no longer selectable. " +
+      "Photos lose their shading. Use a render scale of 3 or more for sharp print text.";
+    out.appendChild(n);
+    add(out, "pdfCutoff", "Cutoff, 1 to 254. Pixels darker than this print black",
+      `<input type="number" id="pdfCutoff" min="1" max="254" step="5" value="${opt("pdfCutoff", 170)}">`);
+  }
+  add(out, "pdfMode", "How to save",
+    `<select id="pdfMode"${colour==="bw"?" disabled":""}>
+       <option value="lossless"${!raster?" selected":""}>Keep text and vectors</option>
+       <option value="raster"${raster?" selected":""}>Rasterise every page</option>
+     </select>`);
+  if (!raster){
     const d = document.createElement("div");
     d.className = "o check";
     d.innerHTML = `<input type="checkbox" id="pdfShrink"${opt("pdfShrink", true) ? " checked" : ""}>` +
@@ -214,7 +238,7 @@ function renderPdfOpts(){
     out.appendChild(d);
     $("pdfShrink").onchange = e => { OPTS.pdfShrink = e.target.checked; };
   }
-  if (opt("pdfMode", "lossless") === "raster"){
+  if (raster){
     const warn = document.createElement("p");
     warn.className = "onote";
     warn.textContent = "Rasterising replaces text with images. It shrinks scanned documents, " +
@@ -222,17 +246,18 @@ function renderPdfOpts(){
     out.appendChild(warn);
     add(out, "pdfDpi", "Render scale, higher is sharper and larger",
       `<input type="number" id="pdfDpi" min="0.5" max="4" step="0.25" value="${opt("pdfDpi", 1.5)}">`);
-    add(out, "pdfImg", "Page images",
+    if (colour !== "bw") add(out, "pdfImg", "Page images",
       `<select id="pdfImg">
          <option value="jpeg"${opt("pdfImg","jpeg")==="jpeg"?" selected":""}>JPEG, much smaller</option>
          <option value="flate"${opt("pdfImg","jpeg")==="flate"?" selected":""}>Lossless, larger</option>
        </select>`);
-    if (opt("pdfImg", "jpeg") === "jpeg"){
+    if (colour !== "bw" && opt("pdfImg", "jpeg") === "jpeg"){
       add(out, "pdfQuality", "JPEG quality",
         `<input type="number" id="pdfQuality" min="0.3" max="1" step="0.05" value="${opt("pdfQuality", 0.72)}">`);
     }
   }
   add(out, "pdfName", "File name", `<input type="text" id="pdfName" value="${escHtml(opt("pdfName","document"))}">`);
+  $("pdfColor").onchange = e => { OPTS.pdfColor = e.target.value; renderPdfOpts(); };
   $("pdfMode").onchange = e => { OPTS.pdfMode = e.target.value; renderPdfOpts(); };
   const img = $("pdfImg");
   if (img) img.onchange = e => { OPTS.pdfImg = e.target.value; renderPdfOpts(); };
@@ -249,10 +274,28 @@ function pReindex(order){
 }
 
 async function pdfCollectPlan(pages){
+  const grey = opt("pdfColor", "keep") === "grey";
   return pages.map(pg => {
     const doc = pdfState.docs[pg.doc];
-    return { doc: doc.parsed, page: doc.parsed.pages[pg.index], rotate: pg.rotate, crop: pg.crop };
+    return { doc: doc.parsed, page: doc.parsed.pages[pg.index], rotate: pg.rotate, crop: pg.crop, grey };
   });
+}
+
+// Remove colour from a rendered page. "grey" keeps every shade of grey.
+// "bw" turns each pixel black or white around a cutoff, which prints crisp text.
+function stripColour(canvas, how){
+  if (how !== "grey" && how !== "bw") return canvas;
+  const cx = canvas.getContext("2d");
+  const img = cx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = img.data;
+  const cut = Math.max(1, Math.min(254, +opt("pdfCutoff", 170) || 170));
+  for (let i = 0; i < d.length; i += 4){
+    let y = (d[i] * 77 + d[i + 1] * 151 + d[i + 2] * 28) >> 8;
+    if (how === "bw") y = y < cut ? 0 : 255;
+    d[i] = d[i + 1] = d[i + 2] = y;
+  }
+  cx.putImageData(img, 0, 0);
+  return canvas;
 }
 
 async function pdfRenderAll(scale, onEach, pages){
@@ -279,7 +322,7 @@ async function pdfRenderAll(scale, onEach, pages){
       c2.getContext("2d").drawImage(c, x, y, w, h, 0, 0, w, h);
       final = c2;
     }
-    out.push(final);
+    out.push(stripColour(final, opt("pdfColor", "keep")));
     onEach && onEach(i + 1, pages.length);
   }
   return out;
@@ -295,7 +338,8 @@ async function pdfSave(onlySelected){
   pBusy = true;
   clearResults($("pResults"));
   const name = (safeName(opt("pdfName", "document")) || "document") + (onlySelected ? "-selected" : "");
-  const mode = opt("pdfMode", "lossless");
+  const colour = opt("pdfColor", "keep");
+  const mode = colour === "bw" ? "raster" : opt("pdfMode", "lossless");
   $("pBar").style.width = "10%";
   try {
     let bytes;
@@ -308,12 +352,13 @@ async function pdfSave(onlySelected){
       }, pages);
       bytes = await imagesToPdf(canvases, {
         pageSize: "letter", fitPage: "image",
-        imageFormat: opt("pdfImg", "jpeg") === "jpeg" ? "jpeg" : "flate",
+        imageFormat: colour !== "bw" && opt("pdfImg", "jpeg") === "jpeg" ? "jpeg" : "flate",
         quality: +opt("pdfQuality", 0.72)
       });
       pLog(`Pages are now images, so the text is no longer selectable.`, "w");
     } else {
-      pLog(`Writing ${pages.length} page(s), keeping text and vectors.`);
+      pLog(`Writing ${pages.length} page(s), keeping text and vectors` +
+        (colour === "grey" ? ", in greyscale." : "."));
       bytes = await pdfBuild(await pdfCollectPlan(pages), { recompress: opt("pdfShrink", true) });
     }
     $("pBar").style.width = "100%";
